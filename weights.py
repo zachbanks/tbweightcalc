@@ -106,17 +106,35 @@ def bench_reps(working_weight, percent):
     return values
 
 
-def deadlift_reps(working_weight):
+def deadlift_reps(working_weight, percent):
     # 2x5 reps, multiplier = 0.4
     # 1x3 reps multiplier = 0.6
     # 1x2 reps multiplier = 0.85
     # 1x5 reps multiplier = 1.0 (ie working weight)
-    return {
+    working_weight = round_weight(working_weight)
+    values = {
         "2x5" : round_weight(working_weight * 0.4),
         "1x3" : round_weight(working_weight * 0.6),
-        "1x2" : round_weight(working_weight * 0.85),
-        "1x5" : round_weight(working_weight * 1.0)
+        "1x2" : round_weight(working_weight * 0.85)
     }
+
+    final_weight = round_weight(working_weight * 1.0)
+    # Week 3
+    if percent == "90%":
+        values.update({'1-3 x 3': final_weight})
+    # Week 5
+    elif percent == "85%":
+        values.update({'1-3 x 3': final_weight})
+    # Week 6
+    elif percent == '95%':
+        values.update({'1-3 x 1-2': final_weight})
+    else:
+        values.update({'1-3 x 5': final_weight})
+
+
+
+    return values
+
 
 # Print progression of WPU. oneRep Max is calculated 1RM with body weight included.
 def weighted_pullup(oneRepMax, body_weight):
@@ -178,7 +196,7 @@ def print_exercise(exercise, oneRepMax):
         elif exercise == "bench press":
             prog[i] = bench_reps(value, percent)
         elif exercise == "deadlift":
-            prog[i] = deadlift_reps(value)
+            prog[i] = deadlift_reps(value, percent)
         print("%s: " % percent) # 70%:
 
         for x, (reps, weight) in enumerate(prog[i].items()):
