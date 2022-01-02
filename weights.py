@@ -34,6 +34,7 @@ def calculate_warmup_plates(input_weight, bar=True):
 
     return final_string
 
+
 # Take working weight for squat and calculate warm up reps for exercise.
 # Return dictionary? { "2x5": 45, "1x5": 120, "1x3": 150}
 def squat_reps(working_weight):
@@ -52,7 +53,6 @@ def squat_reps(working_weight):
     }
 
 
-
 def bench_reps(working_weight):
     # 2x5 reps = Bar, multiplier = 0
     # 1x5 reps multiplier = 0.5
@@ -67,6 +67,7 @@ def bench_reps(working_weight):
         "1x2" : round_weight(working_weight * 0.9),
         "3x5" : round_weight(working_weight * 1.0)
     }
+
 
 def deadlift_reps(working_weight):
     # 2x5 reps, multiplier = 0.4
@@ -100,11 +101,11 @@ def weighted_pullup(oneRepMax, body_weight):
         else:
             values[set] = str(calculate_warmup_plates(round_weight(calc_weight), False))
 
-    print()
     print(" ### Weighted Pull Ups @ %d# ###" % body_weight)
     print()
 
     # TODO: Figure out why it keeps printing None at end of this string. Prob something to do with iteration of dictionary.
+
     for set, weight in values.items():
         print('(3-5 x 5) @ %s | %s' %(set, weight))
 
@@ -122,9 +123,7 @@ def calc_weight_progression(oneRepMax):
         "95%" : round_weight(oneRepMax * .95),
     }
 
-
 # Round weight down to nearest multiple of 5
-# TODO: Possbily change to round up or down better?
 def round_weight(weight):
     return int(5 * round(weight/5))
 
@@ -157,4 +156,4 @@ print_exercise("bench press", 230)
 print_exercise("deadlift", 325)
 
 
-print(weighted_pullup(242, 200))
+weighted_pullup(255, 200)
