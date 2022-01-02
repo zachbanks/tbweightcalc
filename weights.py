@@ -20,15 +20,17 @@ def calculate_warmup_plates(input_weight, bar=True):
                 weight -= v
 
     # Create string to return from function
-    final_string = ""
     final_string = ("%d# - " % corrected_weight)
-    for i, v in enumerate(plate_count):
-        if v > 1:
-            final_string += ("(%s x %d) " % (plates[i], v)) # (45 x 2)
-        elif v == 1:
-            final_string += ('%s ' % (plates[i]))
+
     if bar == True and corrected_weight <= 45:
-        final_string = "Bar"
+        final_string += "Bar"
+    else:
+        for i, v in enumerate(plate_count):
+            if v > 1:
+                final_string += ("(%s x %d) " % (plates[i], v)) # (45 x 2)
+            elif v == 1:
+                final_string += ('%s ' % (plates[i]))
+
 
     return final_string
 
