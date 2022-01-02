@@ -1,7 +1,7 @@
 # TODO: Print each of those in markdown table.
 
 # Takes arg of int value of weight and returns string of plates in format: 400# - (45 x 3) 35 5 2.5
-def calculate_warmup_plates(input_weight, bar=True):
+def calculate_warmup_plates(input_weight, bar=True, bar_weight=45):
     # TODO: Weight must be a multiple of 5
     corrected_weight = round_weight(input_weight)
     weight = corrected_weight
@@ -9,8 +9,8 @@ def calculate_warmup_plates(input_weight, bar=True):
     plates = [45,35,25,15,10,5,2.5]
     plate_count = [0] * len(plates) # Initial array with same number of plates in plates array
 
-    if corrected_weight > 45 and bar == True:
-        weight -= 45 # Subtract weight of bar
+    if corrected_weight > bar_weight and bar == True:
+        weight -= bar_weight # Subtract weight of bar
     weight /= 2 # Only worry about one side of the bar
 
     while weight > 0:
@@ -22,7 +22,7 @@ def calculate_warmup_plates(input_weight, bar=True):
     # Create string to return from function
     final_string = ("%d# - " % corrected_weight)
 
-    if bar == True and corrected_weight <= 45:
+    if bar == True and corrected_weight <= bar_weight:
         final_string += "Bar"
     else:
         for i, v in enumerate(plate_count):
@@ -104,7 +104,6 @@ def weighted_pullup(oneRepMax, body_weight):
     print(" ### Weighted Pull Ups @ %d# ###" % body_weight)
     print()
 
-    # TODO: Figure out why it keeps printing None at end of this string. Prob something to do with iteration of dictionary.
 
     for set, weight in values.items():
         print('(3-5 x 5) @ %s | %s' %(set, weight))
