@@ -1,7 +1,7 @@
 # TODO: Print each of those in markdown table.
 
 # Takes arg of int value of weight and returns string of plates in format: 400# - (45 x 3) 35 5 2.5
-def calculate_warmup_plates(input_weight):
+def calculate_warmup_plates(input_weight, bar=True):
     # TODO: Weight must be a multiple of 5
     corrected_weight = round_weight(input_weight)
     weight = corrected_weight
@@ -9,7 +9,7 @@ def calculate_warmup_plates(input_weight):
     plates = [45,35,25,15,10,5,2.5]
     plate_count = [0] * len(plates) # Initial array with same number of plates in plates array
 
-    if corrected_weight > 45:
+    if corrected_weight > 45 and bar == True:
         weight -= 45 # Subtract weight of bar
     weight /= 2 # Only worry about one side of the bar
 
@@ -22,14 +22,13 @@ def calculate_warmup_plates(input_weight):
     # Create string to return from function
     final_string = ""
     final_string = ("%d# - " % corrected_weight)
-    if corrected_weight > 45:
-        for i, v in enumerate(plate_count):
-            if v > 1:
-                final_string += ("(%s x %d) " % (plates[i], v)) # (45 x 2)
-            elif v == 1:
-                final_string += ('%s ' % (plates[i]))
-    else:
-        final_string += "Bar"
+    for i, v in enumerate(plate_count):
+        if v > 1:
+            final_string += ("(%s x %d) " % (plates[i], v)) # (45 x 2)
+        elif v == 1:
+            final_string += ('%s ' % (plates[i]))
+    if bar == True and corrected_weight <= 45:
+        final_string = "Bar"
 
     return final_string
 
@@ -79,9 +78,34 @@ def deadlift_reps(working_weight):
         "1x5" : round_weight(working_weight * 1.0)
     }
 
-# TODO:
-def weighted_pullup(working_weight, body_weight):
-    pass
+# Print progression of WPU. oneRep Max is calculated 1RM with body weight included.
+def weighted_pullup(oneRepMax, body_weight):
+    multipliers = [.70,.75,.80,.85,.90,.95]
+    values = {
+        '70%' : '0',
+        '75%': '0',
+        '80%': '0',
+        '85%': '0',
+        '90%': '0',
+        '95%': '0',
+    }
+
+    for i, (set, weight) in enumerate(values.items()):
+        calc_weight = (oneRepMax * multipliers[i]) - body_weight
+
+        if calc_weight <= 0:
+            values[set] = "Bodyweight"
+        else:
+            values[set] = str(calculate_warmup_plates(round_weight(calc_weight), False))
+
+    print()
+    print(" ### Weighted Pull Ups @ %d# ###" % body_weight)
+    print()
+
+    # TODO: Figure out why it keeps printing None at end of this string. Prob something to do with iteration of dictionary.
+    for set, weight in values.items():
+        print('(3-5 x 5) @ %s | %s' %(set, weight))
+
 
 # Calculate the weight progressions of 70, 75, 80, 85, 90, 95 given the
 # input of the one rep max
@@ -100,7 +124,7 @@ def calc_weight_progression(oneRepMax):
 # Round weight down to nearest multiple of 5
 # TODO: Possbily change to round up or down better?
 def round_weight(weight):
-    return int(weight // 5 * 5)
+    return int(5 * round(weight/5))
 
 def print_exercise(exercise, oneRepMax):
     weights = calc_weight_progression(oneRepMax)
@@ -129,3 +153,6 @@ def print_exercise(exercise, oneRepMax):
 print_exercise("squat", 400)
 print_exercise("bench press", 230)
 print_exercise("deadlift", 325)
+
+
+print(weighted_pullup(242, 200))
