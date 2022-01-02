@@ -70,25 +70,40 @@ def squat_reps(working_weight, percent):
 
 
 
-    print(values)
     return values
 
 
-
-def bench_reps(working_weight):
+# Pass percent as string ie '90%'
+def bench_reps(working_weight, percent):
     # 2x5 reps = Bar, multiplier = 0
     # 1x5 reps multiplier = 0.5
     # 1x3 reps multiplier = 0.7
     # 1x2 reps multiplier = 0.9
     # 3x5 reps multiplier = 1.0 (ie working weight)
     working_weight = round_weight(working_weight)
-    return {
+    values = {
         "2x5" : 45,
         "1x5" : round_weight(working_weight * 0.5),
         "1x3" : round_weight(working_weight * 0.7),
         "1x2" : round_weight(working_weight * 0.9),
-        "3x5" : round_weight(working_weight * 1.0)
     }
+
+    final_weight = round_weight(working_weight * 1.0)
+    # Week 3
+    if percent == "90%":
+        values.update({'3-4 x 3': final_weight})
+    # Week 5
+    elif percent == "85%":
+        values.update({'3-5 x 3': final_weight})
+    # Week 6
+    elif percent == '95%':
+        values.update({'3-4 x 1-2': final_weight})
+    else:
+        values.update({'3-5 x 5': final_weight})
+
+
+
+    return values
 
 
 def deadlift_reps(working_weight):
@@ -158,12 +173,10 @@ def print_exercise(exercise, oneRepMax):
     # Array of dictionaries that contain all the warmup values.
     prog = [{}] * len(weights)
     for i, (percent, value) in enumerate(weights.items()):
-        print(percent)
-        print(value)
         if exercise == "squat":
             prog[i] = squat_reps(value, percent)
         elif exercise == "bench press":
-            prog[i] = bench_reps(value)
+            prog[i] = bench_reps(value, percent)
         elif exercise == "deadlift":
             prog[i] = deadlift_reps(value)
         print("%s: " % percent) # 70%:
