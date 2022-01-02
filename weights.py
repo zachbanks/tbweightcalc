@@ -1,3 +1,5 @@
+import argparse
+
 # TODO: Print each of those in markdown table.
 
 # Takes arg of int value of weight and returns string of plates in format: 400# - (45 x 3) 35 5 2.5
@@ -130,6 +132,7 @@ def print_exercise(exercise, oneRepMax):
     weights = calc_weight_progression(oneRepMax)
 
     print("##### %s #####" % (exercise.upper()))
+    print('1RM: %s#' % oneRepMax)
     print()
 
     # Array of dictionaries that contain all the warmup values.
@@ -150,9 +153,42 @@ def print_exercise(exercise, oneRepMax):
 
 # Program logic
 
-print_exercise("squat", 400)
-print_exercise("bench press", 230)
-print_exercise("deadlift", 325)
+# TODO: Make basic CLI options to change input_weight
+# Interface: weights.py --squat 400 --bench 200 --deadlift 300 --wpu 245 --bodyweight 190
+
+parser = argparse.ArgumentParser(description = 'Calculates Tactical Barbell weight progression for getting swole.')
+
+# Define program flags.
+parser.add_argument('-sq', '--squat',
+    help='Enter 1RM for Squat',
+    type=int)
+
+parser.add_argument('-bp', '--bench',
+    help='Enter 1RM for Bench Press',
+    type=int)
+
+parser.add_argument('-dl', '--deadlift',
+    help='Enter 1RM for Deadlift',
+    type=int)
+
+parser.add_argument('-wpu', '--weighted-pullup',
+    help='Enter 1RM for Weighted Pull Up followed by bodyweight: "-wpu 245 200"',
+    type=int,
+    nargs=2)
 
 
-weighted_pullup(255, 200)
+args = parser.parse_args()
+
+# If no arguments are supplied to command line, print help screen.
+if not any(vars(args).values()):
+    parser.print_help()
+
+# Print exercise if flag is provided.
+if args.squat:
+    print_exercise("squat", args.squat)
+if args.bench:
+    print_exercise("bench press", args.bench)
+if args.deadlift:
+    print_exercise("deadlift", args.deadlift)
+if args.weighted_pullup:
+    weighted_pullup(args.weighted_pullup[0], args.weighted_pullup[1])
