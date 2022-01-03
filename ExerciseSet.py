@@ -35,6 +35,9 @@ class ExerciseSet:
         str = '%s x %s' % (set, rep) # 3x5 or (3-4)x(1-2)
         str += ' - %d#' % (self.weight)
 
+        # Add plate breakdown
+        str += ' - %s' % self.plate_breakdown
+
         return str
 
 
@@ -62,7 +65,7 @@ class ExerciseSet:
                     weight -= v
 
         # Create string to return from function
-        final_string = ("%d# - " % corrected_weight)
+        final_string = ''
 
         if bar == True and corrected_weight <= cls.bar_weight:
             final_string += "Bar"
