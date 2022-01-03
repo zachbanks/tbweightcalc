@@ -1,11 +1,9 @@
 import argparse
 
 # TODO: Print each of those in markdown table.
-# TODO: Correct week 3,5,6 final rep range.
 
 # Takes arg of int value of weight and returns string of plates in format: 400# - (45 x 3) 35 5 2.5
 def calculate_warmup_plates(input_weight, bar=True, bar_weight=45):
-    # TODO: Weight must be a multiple of 5
     corrected_weight = round_weight(input_weight)
     weight = corrected_weight
 
@@ -41,7 +39,7 @@ def calculate_warmup_plates(input_weight, bar=True, bar_weight=45):
 # Take working weight for squat and calculate warm up reps for exercise.
 # Pass percent as string ie '90%'
 # Return dictionary { "2x5": 45, "1x5": 120, "1x3": 150}
-def get_reps(exercise, working_weight, percent):
+def get_reps(exercise, working_weight, percent, bar_weight=45):
 
     # Round up working weight to nearest multiple of 5.
     working_weight = round_weight(working_weight)
@@ -60,7 +58,7 @@ def get_reps(exercise, working_weight, percent):
     # Deadlift has different sets than squat or bench.
     if exercise == 'squat' or exercise == 'bench press':
         values.update({
-            "2x5" : 45,
+            "2x5" : bar_weight,
             "1x5" : round_weight(working_weight * multiplier[0]),
             "1x3" : round_weight(working_weight * multiplier[1]),
             "1x2" : round_weight(working_weight * multiplier[2])
