@@ -164,7 +164,7 @@ def print_exercise(exercise, oneRepMax):
     # Returns an array of dictionaries with weekly values
     weights = calc_weight_progression(oneRepMax)
 
-    print("##### %s #####" % (exercise.upper()))
+    print("### %s ###" % (exercise.upper()))
     print('1RM: %s#' % oneRepMax)
     print()
 
@@ -176,7 +176,7 @@ def print_exercise(exercise, oneRepMax):
             # Get a dict of reps and weight
             rep_list = get_reps(exercise, value, percent)
 
-            print("Week %d - %s: " % (w, percent)) # Week 1 - 70%:
+            print("Week %d - %s " % (w, percent)) # Week 1 - 70%:
             w += 1
 
             for (reps, weight) in rep_list.items():
@@ -192,6 +192,8 @@ def print_exercise(exercise, oneRepMax):
 parser = argparse.ArgumentParser(description = 'Calculates Tactical Barbell weight progression for getting swole.')
 
 # Define program flags.
+parser.add_argument('-t', '--title', help='Enter title for document. Ex: Tactical Barbell: 2022-01', type=str)
+
 parser.add_argument('-sq', '--squat',
     help='Enter 1RM for Squat',
     type=int)
@@ -217,6 +219,10 @@ if not any(vars(args).values()):
     parser.print_help()
 
 # Print exercise if flag is provided.
+if args.title:
+    print('*** %s ***' % args.title)
+    print()
+    print()
 if args.squat:
     print_exercise("squat", args.squat)
 if args.bench:
