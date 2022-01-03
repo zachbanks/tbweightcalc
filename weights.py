@@ -42,70 +42,68 @@ def calculate_warmup_plates(input_weight, bar=True, bar_weight=45):
 # Pass percent as string ie '90%'
 # Return dictionary { "2x5": 45, "1x5": 120, "1x3": 150}
 def get_reps(exercise, working_weight, percent):
-    # 2x5 reps = Bar, multiplier = 0
-    # 1x5 reps multiplier = 0.4
-    # 1x3 reps multiplier = 0.6
-    # 1x2 reps multiplier = 0.8
-    # 3x5 reps multiplier = 1.0 (ie working weight)
+
+    # Round up working weight to nearest multiple of 5.
     working_weight = round_weight(working_weight)
 
-    squat_multipliers = [0.4, 0.6, 0.8, 1.0]
-    bench_multipliers = [0.5, 0.7, 0.9, 1.0]
-
     values = {}
+    multiplier = []
 
-    if exercise == "squat" or exercise == 'bench press':
+    # Warmup values for each exercise
+    if exercise == 'squat':
+        multiplier = [0.4, 0.6, 0.8, 1.0]
+    elif exercise == 'bench press':
+        multiplier = [0.5, 0.7, 0.9, 1.0]
+    elif exercise == 'deadlift':
+        multiplier = [0.4, 0.6, 0.85, 1.0]
 
-        multiplier = []
-        if exercise == 'squat':
-            multiplier = squat_multipliers
-        elif exercise == 'bench press':
-            multiplier = bench_multipliers
-
-        values = {
+    # Deadlift has different sets than squat or bench.
+    if exercise == 'squat' or exercise == 'bench press':
+        values.update({
             "2x5" : 45,
             "1x5" : round_weight(working_weight * multiplier[0]),
             "1x3" : round_weight(working_weight * multiplier[1]),
-            "1x2" : round_weight(working_weight * multiplier[2]),
-        }
-
-        final_weight = round_weight(working_weight * multiplier[3])
-        # Week 3
-        if percent == "90%":
-            values.update({'3-4 x 3': final_weight})
-        # Week 5
-        elif percent == "85%":
-            values.update({'3-5 x 3': final_weight})
-        # Week 6
-        elif percent == '95%':
-            values.update({'3-4 x 1-2': final_weight})
-        else:
-            values.update({'3-5 x 5': final_weight})
-
-    elif exercise == "deadlift":
-        # 2x5 reps, multiplier = 0.4
-        # 1x3 reps multiplier = 0.6
-        # 1x2 reps multiplier = 0.85
-        # 1x5 reps multiplier = 1.0 (ie working weight)
-        working_weight = round_weight(working_weight)
+            "1x2" : round_weight(working_weight * multiplier[2])
+        })
+    elif exercise == 'deadlift':
         values.update({
-            "2x5" : round_weight(working_weight * 0.4),
-            "1x3" : round_weight(working_weight * 0.6),
-            "1x2" : round_weight(working_weight * 0.85)
+            "2x5" : round_weight(working_weight * multiplier[0]),
+            "1x3" : round_weight(working_weight * multiplier[1]),
+            "1x2" : round_weight(working_weight * multiplier[2])
         })
 
-        final_weight = round_weight(working_weight * 1.0)
-        # Week 3
-        if percent == "90%":
-            values.update({'1-3 x 3': final_weight})
-        # Week 5
-        elif percent == "85%":
-            values.update({'1-3 x 3': final_weight})
-        # Week 6
-        elif percent == '95%':
-            values.update({'1-3 x 1-2': final_weight})
+    final_weight = round_weight(working_weight * multiplier[3])
+
+
+    # Final set changes depending on which week it is.
+    setstr = ""
+
+    # Week 3
+    if percent == "90%":
+        if exercise == 'deadlift':
+            setstr = '1-3 x 3'
         else:
-            values.update({'1-3 x 5': final_weight})
+            setstr = '3-4 x 3'
+    # Week 5
+    elif percent == "85%":
+        if exercise == 'deadlift':
+            setstr = '1-3 x 3'
+        else:
+            setstr = '3-5 x 3'
+    # Week 6
+    elif percent == '95%':
+        if exercise == 'deadlift':
+            setstr = '1-3 x 1-2'
+        else:
+            setstr = '3-4 x 1-2'
+    else:
+        if exercise == 'deadlift':
+            setstr = '1-3 x 5'
+        else:
+            setstr = '3-5 x 5'
+
+
+    values.update({setstr: final_weight})
 
     return values
 
