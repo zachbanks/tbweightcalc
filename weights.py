@@ -72,24 +72,34 @@ def get_reps(exercise, working_weight, percent, bar_weight=45):
 
     final_weight = round_weight(working_weight * multiplier[3])
 
+    setstr = create_set_string(percent, exercise)
+
+    values.update({setstr: final_weight})
+
+    return values
+
+# Creates the proper set range deoending on the week
+# Arg: week string '70%'
+# Returns string
+def create_set_string(week, exercise=""):
 
     # Final set changes depending on which week it is.
     setstr = ""
 
     # Week 3
-    if percent == "90%":
+    if week == "90%":
         if exercise == 'deadlift':
             setstr = '1-3 x 3'
         else:
             setstr = '3-4 x 3'
     # Week 5
-    elif percent == "85%":
+    elif week == "85%":
         if exercise == 'deadlift':
             setstr = '1-3 x 3'
         else:
             setstr = '3-5 x 3'
     # Week 6
-    elif percent == '95%':
+    elif week == '95%':
         if exercise == 'deadlift':
             setstr = '1-3 x 1-2'
         else:
@@ -100,23 +110,23 @@ def get_reps(exercise, working_weight, percent, bar_weight=45):
         else:
             setstr = '3-5 x 5'
 
-
-    values.update({setstr: final_weight})
-
-    return values
-
+    return setstr
 
 # Print progression of WPU. oneRep Max is calculated 1RM with body weight included.
 def weighted_pullup(oneRepMax, body_weight):
     multipliers = [.70,.75,.80,.85,.90,.95]
     values = {
         '70%' : '0',
-        '75%': '0',
         '80%': '0',
-        '85%': '0',
         '90%': '0',
+        '75%': '0',
+        '85%': '0',
         '95%': '0',
     }
+
+    print("### Weighted Pull Ups ###")
+    print('Bodyweight: %d#' % body_weight)
+    print()
 
     for i, (set, weight) in enumerate(values.items()):
         calc_weight = (oneRepMax * multipliers[i]) - body_weight
@@ -126,12 +136,10 @@ def weighted_pullup(oneRepMax, body_weight):
         else:
             values[set] = str(calculate_warmup_plates(round_weight(calc_weight), False))
 
-    print(" ### Weighted Pull Ups @ %d# ###" % body_weight)
-    print()
+        # Week 1: 70% - (3-5 x 5) | Bodyweight
+        print('Week %d: %s - (%s) - %s' %((i+1), set ,create_set_string(set), values[set]))
 
 
-    for set, weight in values.items():
-        print('(3-5 x 5) @ %s | %s' %(set, weight))
 
 
 # Calculate the weight progressions of 70, 75, 80, 85, 90, 95 given the
