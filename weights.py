@@ -1,7 +1,6 @@
 import argparse
 import datetime
 
-# TODO: Print each of those in markdown table.
 
 # Takes arg of int value of weight and returns string of plates in format: 400# - (45 x 3) 35 5 2.5
 def calculate_warmup_plates(input_weight, bar=True, bar_weight=45):
@@ -79,6 +78,7 @@ def get_reps(exercise, working_weight, percent, bar_weight=45):
 
     return values
 
+
 # Creates the proper set range deoending on the week
 # Arg: week string '70%'
 # Returns string
@@ -113,6 +113,7 @@ def create_set_string(week, exercise=""):
 
     return setstr
 
+
 # Print progression of WPU. oneRep Max is calculated 1RM with body weight included.
 def weighted_pullup(oneRepMax, body_weight):
     multipliers = [.70,.75,.80,.85,.90,.95]
@@ -141,8 +142,6 @@ def weighted_pullup(oneRepMax, body_weight):
         print('Week %d: %s - (%s) - %s' %((i+1), set ,create_set_string(set), values[set]))
 
 
-
-
 # Calculate the weight progressions of 70, 75, 80, 85, 90, 95 given the
 # input of the one rep max
 # Returns dictionary
@@ -157,9 +156,11 @@ def calc_weight_progression(oneRepMax):
         {"95%" : round_weight(oneRepMax * .95)}
     ]
 
+
 # Round weight down to nearest multiple of 5
 def round_weight(weight):
     return int(5 * round(weight/5))
+
 
 def print_exercise(exercise, oneRepMax):
     # Returns an array of dictionaries with weekly values
