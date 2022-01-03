@@ -29,9 +29,7 @@ class ExerciseSet:
         elif self.min_reps >= 0:
             rep = '(%d-%d)' % (self.min_reps, self.max_reps)
 
-        # TODO: If plate breakdown, add.
-
-        # Combine strings
+        # Combine set and rep strings
         str = '%s x %s' % (set, rep) # 3x5 or (3-4)x(1-2)
         str += ' - %d#' % (self.weight)
 
@@ -46,7 +44,7 @@ class ExerciseSet:
 
     # Takes arg of int value of weight and returns string of plates in format: 400# - (45 x 3) 35 5 2.5
     @classmethod
-    def calc_plate_breakdown(cls, input_weight=1, bar=True):
+    def calc_plate_breakdown(cls, input_weight=0, bar=True):
         corrected_weight = ExerciseSet.round_weight(input_weight)
         weight = corrected_weight
 
@@ -84,13 +82,3 @@ class ExerciseSet:
     @staticmethod
     def round_weight(weight):
         return int(5 * round(weight/5))
-
-
-# Maybe rename to ExerciseCluster?
-class Week:
-
-    def __init__(self):
-        self.label = ""
-        self.multiplier = 1.0
-        self.week = 0
-        self.sets = []
