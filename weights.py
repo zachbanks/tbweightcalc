@@ -140,20 +140,22 @@ def weighted_pullup(oneRepMax, body_weight):
 # input of the one rep max
 # Returns dictionary
 def calc_weight_progression(oneRepMax):
-    return {
-        "70%" : round_weight(oneRepMax * .70),
-        "75%" : round_weight(oneRepMax * .75),
-        "80%" : round_weight(oneRepMax * .80),
-        "85%" : round_weight(oneRepMax * .85),
-        "90%" : round_weight(oneRepMax * .90),
-        "95%" : round_weight(oneRepMax * .95),
-    }
+    return [
+        {"70%" : round_weight(oneRepMax * .70)},
+        {"80%" : round_weight(oneRepMax * .80)},
+        {"90%" : round_weight(oneRepMax * .90)},
+
+        {"75%" : round_weight(oneRepMax * .75)},
+        {"85%" : round_weight(oneRepMax * .85)},
+        {"95%" : round_weight(oneRepMax * .95)}
+    ]
 
 # Round weight down to nearest multiple of 5
 def round_weight(weight):
     return int(5 * round(weight/5))
 
 def print_exercise(exercise, oneRepMax):
+    # Returns an array of dictionaries with weekly values
     weights = calc_weight_progression(oneRepMax)
 
     print("##### %s #####" % (exercise.upper()))
@@ -161,14 +163,19 @@ def print_exercise(exercise, oneRepMax):
     print()
 
     # Array of dictionaries that contain all the warmup values.
-    prog = [{}] * len(weights)
-    for i, (percent, value) in enumerate(weights.items()):
-        prog[i] = get_reps(exercise, value, percent)
-        print("%s: " % percent) # 70%:
+    w = 1
+    for week in weights:
+        # For each key,value in each week
+        for (percent, value) in week.items():
+            # Get a dict of reps and weight
+            rep_list = get_reps(exercise, value, percent)
 
-        for x, (reps, weight) in enumerate(prog[i].items()):
-            print('%s - %s' % (reps, calculate_warmup_plates(weight)))
-        print()
+            print("Week %d - %s: " % (w, percent)) # Week 1 - 70%:
+            w += 1
+
+            for (reps, weight) in rep_list.items():
+                print('%s - %s' % (reps, calculate_warmup_plates(weight)))
+            print()
 
 
 # Program logic
