@@ -1,4 +1,5 @@
 import argparse
+import datetime
 
 # TODO: Print each of those in markdown table.
 
@@ -231,3 +232,8 @@ if args.deadlift:
     print_exercise("deadlift", args.deadlift)
 if args.weighted_pullup:
     weighted_pullup(args.weighted_pullup[0], args.weighted_pullup[1])
+
+# Print current date at bottom.
+print()
+print()
+print(datetime.datetime.now().strftime('%x'))
