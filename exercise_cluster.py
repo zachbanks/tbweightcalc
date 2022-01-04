@@ -2,14 +2,16 @@ from exercise_set import ExerciseSet
 
 class ExerciseCluster:
 
-    def __init__(self, week=1, sets=[], exercise="", oneRepMax = 0):
+    def __init__(self, week=1, exercise="", oneRepMax = 0):
         self.week = week # Week 3
-        self.sets = sets #
         self.exercise = exercise
         self.oneRepMax = oneRepMax
+        self.sets = []
+
+        self.calc_sets()
 
     def __str__(self):
-        s = ''
+        s = '%s:\n' % self.label
         for i in self.sets:
             s += '%s\n' % str(i)
         return s
@@ -69,3 +71,62 @@ class ExerciseCluster:
     # Adds ExerciseSet object to cluster.
     def add(self, set):
         self.sets.append(set)
+
+    def calc_sets(self):
+        if self.exercise == 'squat' or self.exercise == 'bench,  press' or self.exercise == 'weighted pullup':
+            setreps = [
+                { 'set' : 2, 'reps': 5, 'multiplier': 0 },
+                { 'set' : 1, 'reps': 5, 'multiplier': 0.4 },
+                { 'set' : 1, 'reps': 3, 'multiplier': 0.6 },
+                { 'set' : 1, 'reps': 2, 'multiplier': 0.8 },
+            ]
+
+            # 90%
+            if self.week == 3:
+                setreps.append({
+                 'min_set': 3,
+                 'max_set': 4,
+                 'reps': 3,
+                 'range' : True,
+                 'multiplier': 1.0 })
+            # 85%
+            elif self.week == 5:
+                setreps.append({
+                 'min_set': 3,
+                 'max_set': 5,
+                 'reps': 3,
+                 'range' : True,
+                 'multiplier': 1.0 })
+            # 95%
+            elif self.week == 6:
+                setreps.append({
+                 'min_set': 3,
+                 'max_set': 4,
+                 'min_reps': 1,
+                 'max_reps': 2,
+                 'range' : True,
+                 'multiplier': 1.0 })
+            # All other weeks.
+            else:
+                setreps.append({ 'set' : 5, 'reps': 5, 'multiplier': 1.0 })
+
+            for dict in setreps:
+                s = ExerciseSet()
+                # Deal with set and rep ranges
+                if 'range' in dict and dict['range'] == True:
+                    if 'min_set' in dict:
+                        s.min_set = dict['min_set']
+                    if 'max_set' in dict:
+                        s.max_set = dict['max_set']
+                    if 'min_reps' in dict:
+                        s.min_reps = dict['min_reps']
+                    if 'max_reps' in dict:
+                        s.max_reps = dict['max_reps']
+                else:
+                    s.set = dict['set']
+                    s.reps = dict['reps']
+                s.calc_lifting_weight(self.working_weight, dict['multiplier'])
+                self.add(s)
+
+        elif exercise == 'deadlift':
+            pass
