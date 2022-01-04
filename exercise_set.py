@@ -24,7 +24,7 @@ class ExerciseSet:
         # Format reps
         # Single digit reps only ie 3x5
         if self.min_reps == None:
-            rep = '%d' % (self.reps)
+            rep = '%d' % (self.max_reps)
         elif self.min_reps >= 0 and self.max_reps > 0:
             rep = '(%d-%d)' % (self.min_reps, self.max_reps)
 
@@ -78,9 +78,19 @@ class ExerciseSet:
         else:
             self.weight = w
 
+    def calc_weighted_pullup(self, working_weight, body_weight, multiplier):
+        calc_weight = (working_weight * multiplier) - body_weight
+        if calc_weight <= 0:
+            self.weight = 0
+        else:
+            self.weight = calc_weight
+
+        self.plate_breakdown = ExerciseSet.calc_plate_breakdown(self.weight, bar = False)
+
     # Takes arg of int value of weight and returns string of plates in format: 400# - (45 x 3) 35 5 2.5
     @classmethod
     def calc_plate_breakdown(cls, input_weight=0, bar=True):
+
         corrected_weight = ExerciseSet.round_weight(input_weight)
         weight = corrected_weight
 
@@ -101,7 +111,10 @@ class ExerciseSet:
         # Create string to return from function
         final_string = ''
 
-        if bar == True and corrected_weight <= cls.bar_weight:
+        # Weighted pullup
+        if bar == False and input_weight <= 0:
+            final_string += "Bodyweight"
+        elif bar == True and corrected_weight <= cls.bar_weight:
             final_string += "Bar"
         else:
             for i, v in enumerate(plate_count):

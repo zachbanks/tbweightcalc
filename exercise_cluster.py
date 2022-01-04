@@ -2,11 +2,12 @@ from exercise_set import ExerciseSet
 
 class ExerciseCluster:
 
-    def __init__(self, week=1, exercise="", oneRepMax = 0):
+    def __init__(self, week=1, exercise="", oneRepMax = 0, body_weight = 200):
         self.week = week # Week 3
         self.exercise = exercise
         self.oneRepMax = oneRepMax
         self.sets = []
+        self.body_weight = body_weight
 
         self.calc_sets()
 
@@ -73,24 +74,26 @@ class ExerciseCluster:
         self.sets.append(set)
 
     def calc_sets(self):
+        setreps = []
 
         if self.exercise == 'squat' or self.exercise == 'bench press' or self.exercise == 'weighted pullup':
 
-            # Squat values
-            setreps = [
-                { 'set' : 2, 'reps': 5, 'multiplier': 0 },
-                { 'set' : 1, 'reps': 5, 'multiplier': 0.4 },
-                { 'set' : 1, 'reps': 3, 'multiplier': 0.6 },
-                { 'set' : 1, 'reps': 2, 'multiplier': 0.8 },
-            ]
+            if self.exercise == 'squat' or self.exercise == 'bench press':
+                # Squat values
+                setreps = [
+                    { 'set' : 2, 'reps': 5, 'multiplier': 0 },
+                    { 'set' : 1, 'reps': 5, 'multiplier': 0.4 },
+                    { 'set' : 1, 'reps': 3, 'multiplier': 0.6 },
+                    { 'set' : 1, 'reps': 2, 'multiplier': 0.8 },
+                ]
 
-            # If bench, change multiplier values
-            if self.exercise == 'bench press':
-                bench_values = [0.0, 0.5, 0.7, 0.9]
-                i = 0
-                for dict in setreps:
-                    dict['multiplier'] = bench_values[i]
-                    i += 1
+                # If bench, change multiplier values
+                if self.exercise == 'bench press':
+                    bench_values = [0.0, 0.5, 0.7, 0.9]
+                    i = 0
+                    for dict in setreps:
+                        dict['multiplier'] = bench_values[i]
+                        i += 1
 
             # Change sets and reps for special weeks.
             # 90%
@@ -166,5 +169,9 @@ class ExerciseCluster:
             else:
                 s.set = dict['set']
                 s.reps = dict['reps']
-            s.calc_lifting_weight(self.working_weight, dict['multiplier'])
+            if not self.exercise == 'weighted pullup':
+                s.calc_lifting_weight(self.working_weight, dict['multiplier'])
+            else:
+                s.calc_weighted_pullup(self.working_weight, self.body_weight, dict['multiplier'])
+
             self.add(s)
