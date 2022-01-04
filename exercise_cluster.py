@@ -173,6 +173,10 @@ class ExerciseCluster:
                     s.min_reps = dict['min_reps']
                 if 'max_reps' in dict:
                     s.max_reps = dict['max_reps']
+                if 'set' in dict:
+                    s.set = dict['set']
+                if 'reps' in dict:
+                    s.reps = dict['reps'] 
             else:
                 s.set = dict['set']
                 s.reps = dict['reps']
