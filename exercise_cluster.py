@@ -2,7 +2,7 @@ from exercise_set import ExerciseSet
 
 class ExerciseCluster:
 
-    def __init__(self, week=1, exercise="", oneRepMax = 0, body_weight = 200):
+    def __init__(self, week=1, exercise="", oneRepMax = 0, body_weight = None):
         self.week = week # Week 3
         self.exercise = exercise
         self.oneRepMax = oneRepMax
@@ -12,7 +12,14 @@ class ExerciseCluster:
         self.calc_sets()
 
     def __str__(self):
-        s = '%s:\n' % self.label
+
+        s = 'Week %d: %s' % (self.week, self.label)
+
+        if self.exercise == 'weighted pullup':
+            s += ' - '
+        else:
+            s += '\n'
+
         for i in self.sets:
             s += '%s\n' % str(i)
         return s
