@@ -9,7 +9,10 @@ class ExerciseCluster:
         self.oneRepMax = oneRepMax
 
     def __str__(self):
-        return str(self.sets)
+        s = ''
+        for i in self.sets:
+            s += '%s\n' % str(i)
+        return s
 
     # Allows cluster[0] notatoin. Returns ExerciseSet object.
     def __getitem__(self, item):
