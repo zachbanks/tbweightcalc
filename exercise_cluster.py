@@ -1,11 +1,12 @@
 class ExerciseCluster:
 
-    def __init__(self, label="", multiplier=1.0, week=0, sets=[], exercise="") :
-        self.label = label # 90%
-        self.multiplier = multiplier
+    def __init__(self, week_multiplier=0.7, week=0, sets=[], exercise="", working_weight = 0):
+        self.week_multiplier = week_multiplier # .70
+        self.label = '%d%%' % (int(week_multiplier * 100)) # 90%
         self.week = week # Week 3
         self.sets = sets #
         self.exercise = exercise
+        self.working_weight = working_weight
 
     def __str__(self):
         return str(self.sets)

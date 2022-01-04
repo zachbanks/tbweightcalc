@@ -8,7 +8,6 @@ class ExerciseSet:
         self.min_reps = min_reps
         self.max_reps = max_reps
         self.weight = weight
-        self.plate_breakdown = ExerciseSet.calc_plate_breakdown(self.weight)
         self.bar = bar
 
     def __str__(self):
@@ -38,9 +37,30 @@ class ExerciseSet:
 
         return str
 
+    @property
+    def plate_breakdown(self):
+        return self.__plate_breakdown
 
-    def calc_squat(oneRepMax):
-        pass
+    @plate_breakdown.setter
+    def plate_breakdown(self, s):
+        self.__plate_breakdown = s
+
+    @property
+    def weight(self):
+        return self.__weight
+
+    @weight.setter
+    def weight(self, w):
+        self.__plate_breakdown = ExerciseSet.calc_plate_breakdown(w)
+        self.__weight = w
+
+    def calc_lifting_weight(self, working_weight, multiplier):
+        w = ExerciseSet.round_weight(working_weight * multiplier)
+
+        if w == 0:
+            self.weight = ExerciseSet.bar_weight
+        else:
+            self.weight = w
 
     # Takes arg of int value of weight and returns string of plates in format: 400# - (45 x 3) 35 5 2.5
     @classmethod
@@ -75,8 +95,6 @@ class ExerciseSet:
                     final_string += ('%s ' % (plates[i]))
 
         return final_string
-
-
 
     # Round weight down to nearest multiple of 5
     @staticmethod
