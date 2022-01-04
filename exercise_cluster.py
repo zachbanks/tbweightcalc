@@ -130,7 +130,7 @@ class ExerciseCluster:
                  'multiplier': 1.0 })
             # All other weeks.
             else:
-                setreps.append({ 'set' : 5, 'reps': 5, 'multiplier': 1.0 })
+                setreps.append({ 'min_set': 3, 'max_set' : 5, 'reps': 5, 'multiplier': 1.0, 'range': True })
 
         elif self.exercise == 'deadlift':
 
@@ -159,7 +159,7 @@ class ExerciseCluster:
                  'multiplier': 1.0 })
             # All other weeks.
             else:
-                setreps.append({ 'set' : 3, 'reps': 5, 'multiplier': 1.0 })
+                setreps.append({ 'min_set': 1, 'max_set' : 3, 'reps': 5, 'multiplier': 1.0, 'range': True })
 
         for dict in setreps:
             s = ExerciseSet()
@@ -176,7 +176,7 @@ class ExerciseCluster:
                 if 'set' in dict:
                     s.set = dict['set']
                 if 'reps' in dict:
-                    s.reps = dict['reps'] 
+                    s.reps = dict['reps']
             else:
                 s.set = dict['set']
                 s.reps = dict['reps']
