@@ -10,6 +10,9 @@ def print_exercise(exercise, oneRepMax, week='all', body_weight=None):
 
     c = []
 
+    if week == None:
+        week = 'all'
+
     if week == 'all':
         for i in range(6):
             c.append(ExerciseCluster(week = (i+1), exercise = exercise, oneRepMax = oneRepMax, body_weight = body_weight))
@@ -43,7 +46,9 @@ parser.add_argument('-t', '--title', help='Enter title for document. Ex: Tactica
 
 parser.add_argument('-w', '--week',
     help='Enter week to print out for each exercise selected: 1-6 or "all"',
-    type=str)
+    type=str,
+    nargs='?',
+    const='all')
 
 parser.add_argument('-sq', '--squat',
     help='Enter 1RM for Squat',
