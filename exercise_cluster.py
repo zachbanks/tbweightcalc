@@ -24,7 +24,7 @@ class ExerciseCluster:
             s += '%s\n' % str(i)
         return s
 
-    # Allows cluster[0] notatoin. Returns ExerciseSet object.
+    # Allows cluster[0] notation. Returns ExerciseSet object.
     def __getitem__(self, item):
         return self.sets[item]
 
@@ -35,6 +35,13 @@ class ExerciseCluster:
     # When week is set, update label, and update week multiplier
     @week.setter
     def week(self, w):
+
+        w = int(w)
+
+        # W must be in between weeks 1-6.
+        if w not in range(1,7):
+            w = 1
+
         x = 1.0
         if w == 1:
             x = .70
@@ -53,16 +60,7 @@ class ExerciseCluster:
         # Update label.
         self.label = x
 
-        self.__week = int(w) # Must be int.
-
-
-    @property
-    def label(self):
-        return self.__label
-
-    @label.setter
-    def label(self, l):
-        self.__label = '%d%%' % (int(self.week_multiplier * 100)) # 90%
+        self.__week = w
 
     @property
     def week_multiplier(self):
@@ -71,6 +69,15 @@ class ExerciseCluster:
     @week_multiplier.setter
     def week_multiplier(self, m):
         self.__week_multiplier = m
+        self.label = m # Update label when multiplier changes.
+
+    @property
+    def label(self):
+        return self.__label
+
+    @label.setter
+    def label(self, l):
+        self.__label = '%d%%' % (int(self.week_multiplier * 100)) # 90%
 
     @property
     def working_weight(self):
