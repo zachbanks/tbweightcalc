@@ -123,7 +123,7 @@ class ExerciseSet:
                 elif v == 1:
                     final_string += ('%s ' % (plates[i]))
 
-        return final_string
+        return final_string.strip()
 
     # Round weight down to nearest multiple of 5
     @staticmethod
