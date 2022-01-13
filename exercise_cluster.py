@@ -2,6 +2,11 @@ from exercise_set import ExerciseSet
 
 class ExerciseCluster:
 
+    SQUAT = 'squat'
+    BENCHPRESS = 'bench press'
+    DEADLIFT = 'deadlift'
+    WPU = 'weighted pullup'
+
     def __init__(self, week=1, exercise="", oneRepMax = 0, body_weight = None):
         self.week = week # Week 3
         self.exercise = exercise
@@ -15,7 +20,7 @@ class ExerciseCluster:
 
         s = 'Week %d: %s' % (self.week, self.label)
 
-        if self.exercise == 'weighted pullup':
+        if self.exercise == ExerciseCluster.WPU:
             s += ' - '
         else:
             s += '\n'
@@ -90,9 +95,9 @@ class ExerciseCluster:
     def calc_sets(self):
         setreps = []
 
-        if self.exercise == 'squat' or self.exercise == 'bench press' or self.exercise == 'weighted pullup':
+        if self.exercise == ExerciseCluster.SQUAT or self.exercise == ExerciseCluster.BENCHPRESS or self.exercise == ExerciseCluster.WPU:
 
-            if self.exercise == 'squat' or self.exercise == 'bench press':
+            if self.exercise == ExerciseCluster.SQUAT or self.exercise == ExerciseCluster.BENCHPRESS:
                 # Squat values
                 setreps = [
                     { 'set' : 2, 'reps': 5, 'multiplier': 0 },
@@ -102,7 +107,7 @@ class ExerciseCluster:
                 ]
 
                 # If bench, change multiplier values
-                if self.exercise == 'bench press':
+                if self.exercise == ExerciseCluster.BENCHPRESS:
                     bench_values = [0.0, 0.5, 0.7, 0.9]
                     i = 0
                     for dict in setreps:
@@ -139,7 +144,7 @@ class ExerciseCluster:
             else:
                 setreps.append({ 'min_set': 3, 'max_set' : 5, 'reps': 5, 'multiplier': 1.0, 'range': True })
 
-        elif self.exercise == 'deadlift':
+        elif self.exercise == ExerciseCluster.DEADLIFT:
 
             setreps = [
                 { 'set' : 2, 'reps': 5, 'multiplier': 0.4 },
@@ -172,7 +177,7 @@ class ExerciseCluster:
             s = ExerciseSet()
 
             # Turn bar off if WPU
-            if self.exercise == 'weighted pullup':
+            if self.exercise == ExerciseCluster.WPU:
                 s.bar = False
 
             # Deal with set and rep ranges
@@ -192,7 +197,7 @@ class ExerciseCluster:
             else:
                 s.set = dict['set']
                 s.reps = dict['reps']
-            if not self.exercise == 'weighted pullup':
+            if not self.exercise == ExerciseCluster.WPU:
                 s.calc_lifting_weight(self.working_weight, dict['multiplier'])
             else:
                 s.calc_weighted_pullup(self.working_weight, self.body_weight, dict['multiplier'])
