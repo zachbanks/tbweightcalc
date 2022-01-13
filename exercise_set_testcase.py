@@ -90,11 +90,11 @@ class ExerciseSetTestCase(unittest.TestCase):
         # Weight should = working weight * multiplier - bodyweight
         s.calc_weighted_pullup(260, 200, 1.0)
         self.assertEqual(s.weight, 60)
-        self.assertEqual(s.plate_breakdown, '25 5')
+        self.assertEqual(s.plate_breakdown, '45 15')
 
         s.calc_weighted_pullup(260, 200, 0.90)
         self.assertEqual(s.weight, 34)
-        self.assertEqual(s.plate_breakdown, '15 2.5')
+        self.assertEqual(s.plate_breakdown, '35')
 
         # If weight returns negative => 0
         s.calc_weighted_pullup(260, 200, 0.75)
@@ -120,10 +120,11 @@ class ExerciseSetTestCase(unittest.TestCase):
 
         # Breakdown plate breakdown if bar == False and weight less 45
         s = ExerciseSet(bar = False, weight = 45)
-        self.assertEqual(s.plate_breakdown, '15 5 2.5')
+        self.assertEqual(s.plate_breakdown, '45')
 
         s.weight = 25
-        self.assertEqual(s.plate_breakdown, '10 2.5')
+        self.assertEqual(s.plate_breakdown, '25')
+
 
         # Return bodyweight if weight <= 0 and bar == False
         s = ExerciseSet(weight = -1, bar = False)
@@ -131,6 +132,10 @@ class ExerciseSetTestCase(unittest.TestCase):
 
         s.weight = 0
         self.assertEqual(s.plate_breakdown, 'Bodyweight')
+
+        # If weight > 45 and bar == False
+        s.weight = 105
+        self.assertEqual(s.plate_breakdown, '(45 x 2) 15')
 
 
     def test_round_weight(self):
@@ -157,7 +162,7 @@ class ExerciseSetTestCase(unittest.TestCase):
         s = ExerciseSet(weight = 230, plate_breakdown_on = False)
         self.assertEqual(str(s), '5 x 5 - 230#')
 
-        
+
 #############
 # RUN TESTS #
 #############

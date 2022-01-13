@@ -195,7 +195,12 @@ class ExerciseCluster:
             if not self.exercise == 'weighted pullup':
                 s.calc_lifting_weight(self.working_weight, dict['multiplier'])
             else:
-                s.plate_breakdown_on = False
                 s.calc_weighted_pullup(self.working_weight, self.body_weight, dict['multiplier'])
+
+                # Turn plate break on for WPU if weight is greater than 45#
+                if s.weight > 45:
+                    s.plate_breakdown_on = True
+                else:
+                    s.plate_breakdown_on = False
 
             self.add(s)

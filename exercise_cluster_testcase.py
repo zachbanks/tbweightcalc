@@ -32,6 +32,10 @@ class ExerciseClusterTestCase(unittest.TestCase):
         c = ExerciseCluster(week = 3, exercise='weighted pullup', oneRepMax=240, body_weight=180)
         self.assertEqual(str(c), 'Week 3: 90% - (3-4) x 3 - 35#\n')
 
+        # If WPU weight is > 45#s, then show plate printout. 
+        c = ExerciseCluster(week=6, exercise='weighted pullup', oneRepMax=300, body_weight=180)
+        self.assertEqual(str(c), 'Week 6: 95% - (3-4) x (1-2) - 105# - (45 x 2) 15\n') # Does not include a bar weight
+
 
 
     def test_get_item(self):
@@ -107,6 +111,7 @@ class ExerciseClusterTestCase(unittest.TestCase):
         self.assertEqual(c[1], s2)
 
 
+    # TODO: Add tests
     def test_calc_sets(self):
         pass
 

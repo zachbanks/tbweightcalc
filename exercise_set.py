@@ -55,7 +55,7 @@ class ExerciseSet:
 
     @plate_breakdown.setter
     def plate_breakdown(self, s):
-        self.__plate_breakdown = s
+        self.__plate_breakdown = s # ? Change to self.calc_plate_breakdown()?
 
 
     @property
@@ -112,8 +112,9 @@ class ExerciseSet:
 
         if corrected_weight > self.bar_weight and self.bar == True:
             weight -= self.bar_weight # Subtract weight of bar
-        weight /= 2 # Only worry about one side of the bar
 
+        if self.bar == True:
+            weight /= 2 # Only worry about one side of the bar
 
         while weight > 0:
             for i, v in enumerate(plates):
@@ -124,17 +125,17 @@ class ExerciseSet:
         # Create string to return from function
         final_string = ''
 
-        # Weighted pullup
+        # Create string
+        for i, v in enumerate(plate_count):
+            if v > 1:
+                final_string += ("(%s x %d) " % (plates[i], v)) # (45 x 2)
+            elif v == 1:
+                final_string += ('%s ' % (plates[i]))
+
         if self.bar == False and corrected_weight <= 0:
-            final_string += "Bodyweight"
+            final_string = "Bodyweight"
         elif self.bar == True and corrected_weight <= self.bar_weight:
-            final_string += "Bar"
-        else:
-            for i, v in enumerate(plate_count):
-                if v > 1:
-                    final_string += ("(%s x %d) " % (plates[i], v)) # (45 x 2)
-                elif v == 1:
-                    final_string += ('%s ' % (plates[i]))
+            final_string = "Bar"
 
         
         return final_string.strip()
