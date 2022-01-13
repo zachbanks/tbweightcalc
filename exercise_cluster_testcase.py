@@ -2,6 +2,8 @@ from exercise_cluster import ExerciseCluster
 
 import unittest
 
+from exercise_set import ExerciseSet
+
 ##############
 # UNIT TESTS #
 ##############
@@ -81,15 +83,28 @@ class ExerciseClusterTestCase(unittest.TestCase):
 
 
     def test_label(self):
-        pass
+        c = ExerciseCluster(week = 1)
+        self.assertEqual(c.label, '70%')
+
+        c = ExerciseCluster(week = 6)
+        self.assertEqual(c.label, '95%')
 
 
     def test_working_weight(self):
-        pass
+        c = ExerciseCluster(week = 2, oneRepMax=403)
+        self.assertEqual(c.working_weight, 320)
 
 
     def test_add(self):
-        pass
+        c = ExerciseCluster()
+        s1 = ExerciseSet()
+        s2 = ExerciseSet()
+
+        c.add(s1)
+        c.add(s2)
+
+        self.assertEqual(c[0], s1)
+        self.assertEqual(c[1], s2)
 
 
     def test_calc_sets(self):
