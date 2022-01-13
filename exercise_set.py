@@ -31,7 +31,13 @@ class ExerciseSet:
 
         # Combine set and rep strings
         str = '%s x %s' % (set, rep) # 3x5 or (3-4)x(1-2)
-        str += ' - %d#' % (self.weight)
+
+        if self.weight <= 0 and self.bar == False:
+            # Plate breakdown = Bodyweight
+            str += ' - %s' % self.plate_breakdown
+        else:
+            str += ' - %d#' % (self.weight)
+            
 
         # Add plate breakdown
         if self.plate_breakdown_on:

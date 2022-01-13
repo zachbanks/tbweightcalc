@@ -59,7 +59,7 @@ class ExerciseCluster:
         self.week_multiplier = x
         # Update label.
         self.label = x
-
+                
         self.__week = w
 
     @property
@@ -170,6 +170,11 @@ class ExerciseCluster:
 
         for dict in setreps:
             s = ExerciseSet()
+
+            # Turn bar off if WPU
+            if self.exercise == 'weighted pullup':
+                s.bar = False
+
             # Deal with set and rep ranges
             if 'range' in dict and dict['range'] == True:
                 if 'min_set' in dict:
@@ -190,6 +195,7 @@ class ExerciseCluster:
             if not self.exercise == 'weighted pullup':
                 s.calc_lifting_weight(self.working_weight, dict['multiplier'])
             else:
+                s.plate_breakdown_on = False
                 s.calc_weighted_pullup(self.working_weight, self.body_weight, dict['multiplier'])
 
             self.add(s)
