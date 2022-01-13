@@ -1,14 +1,15 @@
 class ExerciseSet:
 
 
-    def __init__(self, min_set=None, max_set=5, min_reps=None, max_reps=5, weight = 0, bar = True, bar_weight = 45):
+    def __init__(self, min_set=None, max_set=5, min_reps=None, max_reps=5, weight = 0, bar = True, bar_weight = 45, plate_breakdown_on = True):
         self.min_set = min_set
         self.max_set = max_set
         self.min_reps = min_reps
         self.max_reps = max_reps
         self.bar = bar
         self.bar_weight = bar_weight
-        self.weight = weight
+        self.weight = weight # Bar and bar weight must be before weight method is called.
+        self.plate_breakdown_on = plate_breakdown_on
 
     def __str__(self):
         str, set, rep = '', '', ''
@@ -33,7 +34,8 @@ class ExerciseSet:
         str += ' - %d#' % (self.weight)
 
         # Add plate breakdown
-        str += ' - %s' % self.plate_breakdown
+        if self.plate_breakdown_on:
+            str += ' - %s' % self.plate_breakdown
 
         return str
 

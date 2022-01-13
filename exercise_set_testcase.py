@@ -143,6 +143,21 @@ class ExerciseSetTestCase(unittest.TestCase):
         self.assertEqual(ExerciseSet.round_weight(257), 255, "257 => 255")
         self.assertEqual(ExerciseSet.round_weight(343.23), 345)
 
+    def test_plate_breakdown_on(self):
+
+        # Test default value of True
+        s = ExerciseSet(weight = 230)
+        self.assertEqual(str(s), '5 x 5 - 230# - (45 x 2) 2.5')
+
+        # Test setter.
+        s.plate_breakdown_on = False
+        self.assertEqual(str(s), '5 x 5 - 230#')
+
+        # Test init 
+        s = ExerciseSet(weight = 230, plate_breakdown_on = False)
+        self.assertEqual(str(s), '5 x 5 - 230#')
+
+        
 #############
 # RUN TESTS #
 #############
