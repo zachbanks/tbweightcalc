@@ -1,14 +1,14 @@
 class ExerciseSet:
 
-    bar_weight = 45
 
-    def __init__(self, min_set=None, max_set=5, min_reps=None, max_reps=5, weight = 0, bar = True):
+    def __init__(self, min_set=None, max_set=5, min_reps=None, max_reps=5, weight = 0, bar = True, bar_weight = 45):
         self.min_set = min_set
         self.max_set = max_set
         self.min_reps = min_reps
         self.max_reps = max_reps
-        self.weight = weight
         self.bar = bar
+        self.bar_weight = bar_weight
+        self.weight = weight
 
     def __str__(self):
         str, set, rep = '', '', ''
@@ -37,6 +37,10 @@ class ExerciseSet:
 
         return str
 
+    #######################
+    # SETTERS AND GETTERS #
+    #######################
+
     @property
     def plate_breakdown(self):
         return self.__plate_breakdown
@@ -45,14 +49,16 @@ class ExerciseSet:
     def plate_breakdown(self, s):
         self.__plate_breakdown = s
 
+
     @property
     def weight(self):
         return self.__weight
 
     @weight.setter
     def weight(self, w):
-        self.__plate_breakdown = ExerciseSet.calc_plate_breakdown(w)
         self.__weight = w
+        self.__plate_breakdown = self.calc_plate_breakdown()
+        
 
     @property
     def set(self):
@@ -74,7 +80,7 @@ class ExerciseSet:
         w = ExerciseSet.round_weight(working_weight * multiplier)
 
         if w == 0:
-            self.weight = ExerciseSet.bar_weight
+            self.weight = self.bar_weight
         else:
             self.weight = w
 
@@ -85,20 +91,19 @@ class ExerciseSet:
         else:
             self.weight = calc_weight
 
-        self.plate_breakdown = ExerciseSet.calc_plate_breakdown(self.weight, bar = False)
+        self.plate_breakdown = self.calc_plate_breakdown()
 
     # Takes arg of int value of weight and returns string of plates in format: 400# - (45 x 3) 35 5 2.5
-    @classmethod
-    def calc_plate_breakdown(cls, input_weight=0, bar=True):
+    def calc_plate_breakdown(self):
 
-        corrected_weight = ExerciseSet.round_weight(input_weight)
+        corrected_weight = ExerciseSet.round_weight(self.weight)
         weight = corrected_weight
 
         plates = [45,35,25,15,10,5,2.5]
         plate_count = [0] * len(plates) # Initial array with same number of plates in plates array
 
-        if corrected_weight > cls.bar_weight and bar == True:
-            weight -= cls.bar_weight # Subtract weight of bar
+        if corrected_weight > self.bar_weight and self.bar == True:
+            weight -= self.bar_weight # Subtract weight of bar
         weight /= 2 # Only worry about one side of the bar
 
 
@@ -112,9 +117,9 @@ class ExerciseSet:
         final_string = ''
 
         # Weighted pullup
-        if bar == False and input_weight <= 0:
+        if self.bar == False and corrected_weight <= 0:
             final_string += "Bodyweight"
-        elif bar == True and corrected_weight <= cls.bar_weight:
+        elif self.bar == True and corrected_weight <= self.bar_weight:
             final_string += "Bar"
         else:
             for i, v in enumerate(plate_count):
@@ -123,6 +128,7 @@ class ExerciseSet:
                 elif v == 1:
                     final_string += ('%s ' % (plates[i]))
 
+        
         return final_string.strip()
 
     # Round weight down to nearest multiple of 5
