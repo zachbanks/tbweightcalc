@@ -1,31 +1,48 @@
-
-from exercise_set import ExerciseSet
-from exercise_cluster import ExerciseCluster
-
 import argparse
 import datetime
 
+from exercise_cluster import ExerciseCluster
+from exercise_set import ExerciseSet
 
-def print_exercise(exercise, oneRepMax, week='all', body_weight=None):
 
+def calc_1rm(weight: int, reps: int = 1):
+    """Calculates 1RM using Brzycki Equation"""
+    return round(weight / (1.0278 - (0.0278 * reps)))
+
+
+def print_exercise(exercise, oneRepMax, week="all", body_weight=None):
     c = []
 
     if week == None:
-        week = 'all'
+        week = "all"
 
-    if week == 'all':
+    if week == "all":
         for i in range(6):
-            c.append(ExerciseCluster(week = (i+1), exercise = exercise, oneRepMax = oneRepMax, body_weight = body_weight))
+            c.append(
+                ExerciseCluster(
+                    week=(i + 1),
+                    exercise=exercise,
+                    oneRepMax=oneRepMax,
+                    body_weight=body_weight,
+                )
+            )
     elif int(week) > 0 and int(week) <= 6:
-        c.append(ExerciseCluster(week = int(week), exercise = exercise, oneRepMax = oneRepMax, body_weight = body_weight))
+        c.append(
+            ExerciseCluster(
+                week=int(week),
+                exercise=exercise,
+                oneRepMax=oneRepMax,
+                body_weight=body_weight,
+            )
+        )
 
     print("### %s ###" % (exercise.upper()))
 
-    s = ''
+    s = ""
     if body_weight:
-        s += '1RM: %d# @ BW of %d#' % ((oneRepMax - body_weight), body_weight)
+        s += "1RM: %d# @ BW of %d#" % ((oneRepMax - body_weight), body_weight)
     else:
-        s = '1RM: %s#' % oneRepMax
+        s = "1RM: %s#" % oneRepMax
     print(s)
     print()
 
@@ -34,38 +51,52 @@ def print_exercise(exercise, oneRepMax, week='all', body_weight=None):
         print(x)
 
 
-
 # Program logic
 
 # Interface: weights.py --squat 400 --bench 200 --deadlift 300 --wpu 245 --bodyweight 190
 
-parser = argparse.ArgumentParser(description = 'Calculates Tactical Barbell weight progression for getting swole.')
+parser = argparse.ArgumentParser(
+    description="Calculates Tactical Barbell weight progression for getting swole."
+)
 
 # Define program flags.
-parser.add_argument('-t', '--title', help='Enter title for document. Ex: Tactical Barbell: 2022-01', type=str)
+parser.add_argument(
+    "-t",
+    "--title",
+    help="Enter title for document. Ex: Tactical Barbell: 2022-01",
+    type=str,
+)
 
-parser.add_argument('-w', '--week',
+parser.add_argument(
+    "-w",
+    "--week",
     help='Enter week to print out for each exercise selected: 1-6 or "all"',
     type=str,
-    nargs='?',
-    const='all')
+    nargs="?",
+    const="all",
+)
 
-parser.add_argument('-sq', '--squat',
-    help='Enter 1RM for Squat',
-    type=int)
+parser.add_argument("-sq", "--squat", help="Enter 1RM for Squat", type=int)
 
-parser.add_argument('-bp', '--bench',
-    help='Enter 1RM for Bench Press',
-    type=int)
+parser.add_argument("-bp", "--bench", help="Enter 1RM for Bench Press", type=int)
 
-parser.add_argument('-dl', '--deadlift',
-    help='Enter 1RM for Deadlift',
-    type=int)
+parser.add_argument("-dl", "--deadlift", help="Enter 1RM for Deadlift", type=int)
 
-parser.add_argument('-wpu', '--weighted-pullup',
+parser.add_argument(
+    "-wpu",
+    "--weighted-pullup",
     help='Enter 1RM for Weighted Pull Up followed by bodyweight: "-wpu 245 200"',
     type=int,
-    nargs=2)
+    nargs=2,
+)
+
+parser.add_argument(
+    "--1rm",
+    help="Enter weight lifted and number of reps",
+    type=int,
+    nargs=2,
+    dest="onerm",
+)
 
 
 args = parser.parse_args()
@@ -76,19 +107,27 @@ if not any(vars(args).values()):
 
 # Print exercise if flag is provided.
 if args.title:
-    print('*** %s ***' % args.title)
+    print("*** %s ***" % args.title)
     print()
     print()
 if args.squat:
-    print_exercise(exercise = "squat", oneRepMax = args.squat, week = args.week)
+    print_exercise(exercise="squat", oneRepMax=args.squat, week=args.week)
 if args.bench:
-    print_exercise(exercise = "bench press", oneRepMax = args.bench, week = args.week)
+    print_exercise(exercise="bench press", oneRepMax=args.bench, week=args.week)
 if args.deadlift:
-    print_exercise(exercise = "deadlift", oneRepMax = args.deadlift, week = args.week)
+    print_exercise(exercise="deadlift", oneRepMax=args.deadlift, week=args.week)
 if args.weighted_pullup:
-    print_exercise(exercise = "weighted pullup", oneRepMax = args.weighted_pullup[0], body_weight = args.weighted_pullup[1], week = args.week)
+    print_exercise(
+        exercise="weighted pullup",
+        oneRepMax=args.weighted_pullup[0],
+        body_weight=args.weighted_pullup[1],
+        week=args.week,
+    )
+if args.onerm:
+    onerm = calc_1rm(weight=args.onerm[0], reps=args.onerm[1])
+    print(f"One Rep Max: {onerm}")
 
 # Print current date at bottom.
 print()
 print()
-print(datetime.datetime.now().strftime('%x'))
+print(datetime.datetime.now().strftime("%x"))
