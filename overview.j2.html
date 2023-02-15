@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style type="text/css" media="print">
+        @media print {
+            a::after {
+                content: " (" attr(href) ") ";
+            }
+
+            pre {
+                white-space: pre-wrap;
+            }
+
+            @page {
+                size: Letter;
+                margin: 1in;
+            }
+
+            /* @page :first {
+                @top-right {
+                    content: "";
+                }
+            } */
+
+            body {
+                font-family: sans-serif;
+            }
+
+            .content-block {
+                break-inside: avoid;
+                margin-top: 4em;
+                margin-bottom: 4em;
+            }
+
+            .vc-title {
+
+                font-size: 20pt;
+                font-family: sans-serif;
+                text-align: center;
+                text-decoration: underline;
+            }
+
+            .month {
+                font-weight: bold;
+                text-align: left;
+                padding-right: 5px;
+            }
+
+            .days {
+                word-spacing: -4px;
+            }
+
+            .month-line {
+                font-family: 'Courier New', Courier, monospace;
+                line-height: 5px;
+                font-size: small;
+            }
+
+            .schedule {
+                padding-bottom: 5px;
+            }
+
+            .work-schedule {
+                padding-left: 0.25in;
+            }
+
+            .vday-schedule {
+                padding-left: 0.6in;
+            }
+
+            .schedule-title {
+                font-family: sans-serif;
+                padding-bottom: 3px;
+                text-align: center;
+            }
+
+            div.additional-info {
+                page-break-before: always;
+            }
+
+            li {
+                padding-bottom: 5px;
+            }
+
+            .subtitle {
+                text-align: center;
+                padding-bottom: 10px;
+            }
+
+        }
+    </style>
+</head>
+
+<body>
+    <main>
+        <header>
+            <h1 class="vc-title">{{ year }} {{ schedule.vclass }}-Class Summary</h1>
+        </header>
+        <div class="content-block work-schedule">
+            <h3 class="schedule-title">{{ schedule.vclass }}-Class ({{ schedule.wday_count }} Work Days)</h3>
+            <div class="schedule">
+                {% for month, days in schedule.vdays_by_month(False, bold_holidays=True) %}
+                <div class="month-line">
+                    <p>
+                        <span class="month">{{ month }}</span>
+                        <span class="days">{{ days }}</span>
+                    </p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="content-block vday-schedule">
+            <h3 class="schedule-title">{{ schedule.vclass }}-Class ({{ schedule.vday_count }} V-Days)</h3>
+            <div class="schedule">
+                {% for month, days in schedule.vdays_by_month(bold_holidays=True) %}
+                <div class="month-line">
+                    <p>
+                        <span class="month">{{ month }}</span>
+                        <span class="days">{{ days }}</span>
+                    </p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="additional-info">
+
+            <h2 class="subtitle">{{ schedule.year }} {{ schedule.vclass }}-Class</h2>
+            <div class="content-block">
+                <h4>
+                    Comp Time Information
+                </h4>
+                <ul class="comptime-info">
+                    <li>
+                        Total Possible Comp Time: {{ schedule.total_potential_comp_time }} hours
+                    </li>
+                    <li>
+                        Yearly Earned Comp Time: <strong>{{ schedule.yearly_earned_comp_time }} hours</strong>
+                    </li>
+                    <li>
+                        On Duty Comp Time Earned: {{ schedule.working_comp_time }} hours
+                    </li>
+                    <li>
+                        Off Duty Comp Time Earned: {{ schedule.off_comp_time }} hours
+                    </li>
+                </ul>
+            </div>
+            <div class="content-block">
+                <h4>
+                    Holidays Worked ({{ schedule.num_of_holidays_worked }}):
+                </h4>
+                <ul class="holidays-worked">
+                    {% for holiday in schedule.holidays_worked %}
+                    <li class='holiday'>{{ holiday[0].strftime("%m/%d/%Y") }} - {{ holiday[1] }}
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <div class="content-block">
+                <h4>
+                    Holidays Off ({{ schedule.num_of_holidays_off }}):
+                </h4>
+                <ul class="holidays-off">
+                    {% for holiday in schedule.holidays_off %}
+                    <li class='holiday'>{{ holiday[0].strftime("%m/%d/%Y") }} - {{ holiday[1] }}
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </main>
+</body>
+
+</html>
