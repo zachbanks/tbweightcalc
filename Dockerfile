@@ -30,7 +30,9 @@ RUN pip install --no-cache-dir \
     jinja2 \
     weasyprint
 
-RUN poetry install --with dev
+
+RUN apt-get update && \
+    apt-get install -y pandoc texlive-xetex
 
 # 5. Default command
 CMD ["python", "cli.py"]

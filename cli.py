@@ -3,19 +3,12 @@ import datetime
 
 import tbweightcalc as tb
 from tbweightcalc.program import apply_markdown
+from tbweightcalc.program import markdown_to_pdf
 
 # Interface: weights.py --squat 400 --bench 200 --deadlift 300 --wpu 245 --bodyweight 190
 
 parser = argparse.ArgumentParser(
     description="Calculates Tactical Barbell weight progression for getting swole."
-)
-
-# Define program flags.
-parser.add_argument(
-    "-t",
-    "--title",
-    help="Enter title for document. Ex: Tactical Barbell: 2022-01",
-    type=str,
 )
 
 parser.add_argument(
@@ -49,6 +42,17 @@ parser.add_argument(
     dest="onerm",
 )
 
+parser.add_argument(
+    "--pdf",
+    metavar="PATH",
+    help="Write output to a PDF at PATH instead of printing markdown",
+)
+
+parser.add_argument(
+    "--title",
+    help="Optional title for the program/PDF; if omitted, a default title is used",
+)
+
 
 args = parser.parse_args()
 
@@ -56,12 +60,11 @@ args = parser.parse_args()
 if not any(vars(args).values()):
     parser.print_help()
 
-# Print exercise if flag is provided.
 if args.title:
-    print(apply_markdown(f"{args.title}", "h1"))
-    print()
-    print()
-    
+    title = args.title
+else:
+    title = f"Tactical Barbell Max Strength: {datetime.date.today():%Y-%m-%d}"
+
 WEEK_LABELS = {
     1: "70%",
     2: "80%",
@@ -71,21 +74,100 @@ WEEK_LABELS = {
     6: "95%",
 }
 
-for i in range(1,7):
-    print(apply_markdown(f"WEEK {i} - {WEEK_LABELS[i]}", "h2"))
-    print()
-    tb.Program.print_exercise(exercise="squat", oneRepMax=args.squat, week=i)
-    tb.Program.print_exercise(exercise="bench press", oneRepMax=args.bench, week=i)
-    tb.Program.print_exercise(exercise="deadlift", oneRepMax=args.deadlift, week=i)
-    tb.Program.print_exercise(
-        exercise="weighted pullup",
-        oneRepMax=args.weighted_pullup[0],
-        body_weight=args.weighted_pullup[1],
-        week=i,
-    )
-    print()
-    print(apply_markdown("", "hr"))
-    print()
+def build_program_markdown(args, for_pdf: bool = False) -> str:
+    """
+    Build the Tactical Barbell program markdown.
+
+    for_pdf=False:
+        - includes visible '---' horizontal rules between weeks
+    for_pdf=True:
+        - uses raw '\\newpage' between weeks (no HR printed in PDF)
+    """
+    lines: list[str] = []
+
+    for week in range(1, 7):
+        # WEEK header
+        lines.append(apply_markdown(f"WEEK {week} - {WEEK_LABELS[week]}", "h2"))
+        lines.append("")
+
+        # Squat
+        lines.append(
+            tb.Program.print_exercise(
+                exercise="squat",
+                oneRepMax=args.squat,
+                week=week,
+                body_weight=None,
+                print_1rm=True,
+            )
+        )
+        lines.append("")
+
+        # Bench
+        lines.append(
+            tb.Program.print_exercise(
+                exercise="bench press",
+                oneRepMax=args.bench,
+                week=week,
+                body_weight=None,
+                print_1rm=True,
+            )
+        )
+        lines.append("")
+
+        # Deadlift
+        lines.append(
+            tb.Program.print_exercise(
+                exercise="deadlift",
+                oneRepMax=args.deadlift,
+                week=week,
+                body_weight=None,
+                print_1rm=True,
+            )
+        )
+        lines.append("")
+
+        # Weighted pull-up
+        lines.append(
+            tb.Program.print_exercise(
+                exercise="weighted pullup",
+                oneRepMax=args.weighted_pullup[0],
+                body_weight=args.weighted_pullup[1],
+                week=week,
+                print_1rm=True,
+            )
+        )
+
+        # Between weeks: HR or page break
+        if week != 6:  # no separator after last week
+            if for_pdf:
+                # Page break only, no visible HR
+                lines.append(r"\pagebreak")
+            else:
+                # Visible horizontal rule in terminal markdown
+                lines.append("")
+                # lines.append(apply_markdown("", "hr"))
+                lines.append("")
+
+    return "\n".join(lines).rstrip()  # strip trailing blank lines
+
+if __name__ == "__main__":
+    args = parser.parse_args()
+
+    # Decide title
+    if args.title:
+        title = args.title
+    else:
+        title = f"Tactical Barbell Max Strength: {datetime.date.today():%Y-%m-%d}"
+
+    if args.pdf:
+        # Build PDF-specific markdown (with \newpage instead of HR)
+        body_markdown = build_program_markdown(args, for_pdf=True)
+        markdown_to_pdf(body_markdown, args.pdf, title=title)
+    else:
+        # Build terminal/markdown output (with visible ---)
+        body_markdown = build_program_markdown(args, for_pdf=False)
+        print(f"# {title}\n")
+        print(body_markdown)
 
 # if args.squat:
 #     tb.Program.print_exercise(exercise="squat", oneRepMax=args.squat, week=args.week)
@@ -109,6 +191,4 @@ for i in range(1,7):
 #     print(f"One Rep Max: {onerm}")
 
 # Print current date at bottom.
-print()
-print()
-print(datetime.datetime.now().strftime("%x"))
+
