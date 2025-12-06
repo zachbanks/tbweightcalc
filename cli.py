@@ -2,6 +2,7 @@ import argparse
 import datetime
 
 import tbweightcalc as tb
+from tbweightcalc.program import apply_markdown
 
 # Interface: weights.py --squat 400 --bench 200 --deadlift 300 --wpu 245 --bodyweight 190
 
@@ -57,29 +58,55 @@ if not any(vars(args).values()):
 
 # Print exercise if flag is provided.
 if args.title:
-    print("*** %s ***" % args.title)
+    print(apply_markdown(f"{args.title}", "h1"))
     print()
     print()
-if args.squat:
-    tb.Program.print_exercise(exercise="squat", oneRepMax=args.squat, week=args.week)
-if args.bench:
-    tb.Program.print_exercise(
-        exercise="bench press", oneRepMax=args.bench, week=args.week
-    )
-if args.deadlift:
-    tb.Program.print_exercise(
-        exercise="deadlift", oneRepMax=args.deadlift, week=args.week
-    )
-if args.weighted_pullup:
+    
+WEEK_LABELS = {
+    1: "70%",
+    2: "80%",
+    3: "90%",
+    4: "75%",
+    5: "85%",
+    6: "95%",
+}
+
+for i in range(1,7):
+    print(apply_markdown(f"WEEK {i} - {WEEK_LABELS[i]}", "h2"))
+    print()
+    tb.Program.print_exercise(exercise="squat", oneRepMax=args.squat, week=i)
+    tb.Program.print_exercise(exercise="bench press", oneRepMax=args.bench, week=i)
+    tb.Program.print_exercise(exercise="deadlift", oneRepMax=args.deadlift, week=i)
     tb.Program.print_exercise(
         exercise="weighted pullup",
         oneRepMax=args.weighted_pullup[0],
         body_weight=args.weighted_pullup[1],
-        week=args.week,
+        week=i,
     )
-if args.onerm:
-    onerm = tb.Program.calc_1rm(weight=args.onerm[0], reps=args.onerm[1])
-    print(f"One Rep Max: {onerm}")
+    print()
+    print(apply_markdown("", "hr"))
+    print()
+
+# if args.squat:
+#     tb.Program.print_exercise(exercise="squat", oneRepMax=args.squat, week=args.week)
+# if args.bench:
+#     tb.Program.print_exercise(
+#         exercise="bench press", oneRepMax=args.bench, week=args.week
+#     )
+# if args.deadlift:
+#     tb.Program.print_exercise(
+#         exercise="deadlift", oneRepMax=args.deadlift, week=args.week
+#     )
+# if args.weighted_pullup:
+#     tb.Program.print_exercise(
+#         exercise="weighted pullup",
+#         oneRepMax=args.weighted_pullup[0],
+#         body_weight=args.weighted_pullup[1],
+#         week=args.week,
+#     )
+# if args.onerm:
+#     onerm = tb.Program.calc_1rm(weight=args.onerm[0], reps=args.onerm[1])
+#     print(f"One Rep Max: {onerm}")
 
 # Print current date at bottom.
 print()

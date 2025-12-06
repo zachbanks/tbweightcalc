@@ -1,5 +1,5 @@
 from .exercise_set import ExerciseSet
-
+from .program import apply_markdown
 
 class ExerciseCluster:
     SQUAT = "squat"
@@ -17,15 +17,19 @@ class ExerciseCluster:
         self.calc_sets()
 
     def __str__(self):
-        s = "Week %d: %s" % (self.week, self.label)
+        s = ""
+        last_index = len(self.sets) - 1
 
-        if self.exercise == ExerciseCluster.WPU:
-            s += " - "
-        else:
-            s += "\n"
+        for idx, ex_set in enumerate(self.sets):
+            text = str(ex_set)
 
-        for i in self.sets:
-            s += "%s\n" % str(i)
+            # If this is the last set, bold it
+            if idx == last_index:
+                text = apply_markdown(text, "bold")
+
+            # Then wrap in unordered-list markdown
+            s += apply_markdown(f"{text}\n", "ul")
+
         return s
 
     # Allows cluster[0] notation. Returns ExerciseSet object.

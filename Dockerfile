@@ -30,5 +30,7 @@ RUN pip install --no-cache-dir \
     jinja2 \
     weasyprint
 
+RUN poetry install --with dev
+
 # 5. Default command
 CMD ["python", "cli.py"]
