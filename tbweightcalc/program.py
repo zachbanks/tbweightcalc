@@ -213,17 +213,13 @@ def markdown_to_pdf(md_text: str, output_path: str, title: str | None = None):
         "-V",
         f"title={title}",
         "-V", "header-includes=\\usepackage{titling}",
-        "-V", "header-includes=\\setlength{\\droptitle}{-5em}",
+        "-V", "header-includes=\\setlength{\\droptitle}{-7em}",
 
         # Coding-style font + layout
-        "-V",
-        "mainfont=DejaVu Sans Mono",
-        "-V",
-        "monofont=DejaVu Sans Mono",
-        "-V",
-        "fontsize=12pt",
-        "-V",
-        "geometry:margin=1in",
+        "-V", "mainfont=JetBrains Mono",
+        "-V", "monofont=JetBrains Mono",
+        "-V", "fontsize=12pt",
+        "-V", "geometry:margin=1in",
 
         # fancyhdr: footer only, no header rule
         "-V",
