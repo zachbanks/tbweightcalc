@@ -1,4 +1,4 @@
-from exercise_set import ExerciseSet
+from tbweightcalc.exercise_set import ExerciseSet
 
 import unittest
 
@@ -6,7 +6,7 @@ import unittest
 # UNIT TESTS #
 ##############
 
-class ExerciseSetTestCase(unittest.TestCase):
+class TestExerciseSet(unittest.TestCase):
 
     def test_to_str(self):
         # Returns correctly formatted set string.
@@ -136,6 +136,8 @@ class ExerciseSetTestCase(unittest.TestCase):
         # If weight > 45 and bar == False
         s.weight = 105
         self.assertEqual(s.plate_breakdown, '(45 x 2) 15')
+
+        #TODO: Test plate breakdown with custom plates ie 55#, 100#, etc
 
 
     def test_round_weight(self):

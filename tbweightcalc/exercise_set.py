@@ -1,3 +1,4 @@
+from typing import List, Optional
 class ExerciseSet:
     def __init__(
         self,
@@ -109,14 +110,16 @@ class ExerciseSet:
         self.plate_breakdown = self.calc_plate_breakdown()
 
     # Takes arg of int value of weight and returns string of plates in format: 400# - (45 x 3) 35 5 2.5
-    def calc_plate_breakdown(self):
+    def calc_plate_breakdown(self, available_plates: Optional[List[int]] = None):
         corrected_weight = ExerciseSet.round_weight(self.weight)
         weight = corrected_weight
 
-        plates = [45, 35, 25, 15, 10, 5, 2.5]
-        plate_count = [0] * len(
-            plates
-        )  # Initial array with same number of plates in plates array
+        # TODO: Turn on/off different plates with option flag, ie 55, 35, 15
+        if available_plates is None:
+            plates = [45, 35, 25, 15, 10, 5, 2.5]
+        else:
+            plates = sorted(available_plates, reverse=True)
+        plate_count = [0] * len(plates)  # Initial array with same number of plates in plates array
 
         if corrected_weight > self.bar_weight and self.bar == True:
             weight -= self.bar_weight  # Subtract weight of bar

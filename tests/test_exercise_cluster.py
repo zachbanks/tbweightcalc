@@ -1,15 +1,14 @@
-from tbweightcalc import ExerciseCluster
-
 import unittest
 
-from tbweightcalc import ExerciseSet
+from tbweightcalc.exercise_set import ExerciseSet
+from tbweightcalc.exercise_cluster import ExerciseCluster
 
 ##############
 # UNIT TESTS #
 ##############
 
 
-class ExerciseClusterTestCase(unittest.TestCase):
+class TestExerciseCluster(unittest.TestCase):
     def test_str(self):
         # Correctly prints squat output
         c = ExerciseCluster(week=1, exercise=ExerciseCluster.SQUAT, oneRepMax=400)
@@ -118,10 +117,28 @@ class ExerciseClusterTestCase(unittest.TestCase):
         self.assertEqual(c[0], s1)
         self.assertEqual(c[1], s2)
 
-    # TODO: Add tests
-    def test_calc_sets(self):
-        pass
 
+    def test_calc_sets(self):
+
+        # Custom weight sets.
+        s = ExerciseSet(weight=275) # Bar should be included in weight.
+        self.assertEqual(s.calc_plate_breakdown([45,25,10,5,2.5]), "(45 x 2) 25")
+
+        s = ExerciseSet(weight=245)
+        self.assertEqual(s.calc_plate_breakdown([100,45,25,10,5,2.5]), "100")
+        
+        s = ExerciseSet(weight=45)
+        self.assertEqual(s.calc_plate_breakdown([45,25,10,5,2.5]), "Bar")
+
+        s = ExerciseSet(weight=240)
+        self.assertEqual(s.calc_plate_breakdown([55,45,35,25,10,5,2.5]), "55 35 5 2.5")
+
+        s = ExerciseSet(bar_weight=35, weight=240)
+        self.assertEqual(s.calc_plate_breakdown([55,45,35,25,10,5,2.5]), "55 45 2.5")
+
+        # TODO: what happens if bad plate list is given? 1.24 24# etc? Must include 1.25 plates though.
+        # s = ExerciseSet(weight=242.5)
+        # self.assertEqual(s.calc_plate_breakdown([45,35,25,10,5,2.5, 1.25]), "???")
 
 #############
 # RUN TESTS #
