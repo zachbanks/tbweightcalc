@@ -364,8 +364,13 @@ def main() -> None:
         "--pdf",
         help="Optional explicit path for the PDF output; defaults to ~/Downloads/<title>.pdf",
     )
+
     if len(sys.argv) == 1:
-        run_interactive()
+        try:
+            run_interactive()
+        except KeyboardInterrupt:
+            # Clean, quiet exit on Ctrl-C
+            print("\n[Aborted by user]")
         return
 
     args = parser.parse_args()

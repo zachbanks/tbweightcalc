@@ -1,6 +1,7 @@
 import argparse
 from pathlib import Path
 import sys
+import builtins
 
 import tbweightcalc.cli as cli
 
@@ -319,3 +320,31 @@ def test_main_interactive_both_generates_pdf(monkeypatch, capsys, tmp_path):
     assert "markdown" in pdf_call
     assert pdf_call["markdown"]  # non-empty markdown
     assert pdf_call["title"] is not None
+    
+
+
+
+def test_main_interactive_ctrl_c_exits_cleanly(monkeypatch, capsys):
+    """
+    If the user hits Ctrl-C in interactive mode, main() should
+    exit cleanly without propagating KeyboardInterrupt.
+    """
+
+    # Simulate: tbcalc  (no args)
+    monkeypatch.setattr(sys, "argv", ["tbcalc"])
+
+    # First call to input() raises KeyboardInterrupt, like pressing Ctrl-C
+    def fake_input(prompt: str = "") -> str:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(builtins, "input", fake_input)
+
+    # Make sure we don't touch clipboard or PDF in this path
+    monkeypatch.setattr(cli, "copy_to_clipboard", lambda text: None)
+    monkeypatch.setattr(cli, "markdown_to_pdf", lambda *a, **k: None)
+
+    # This should NOT raise KeyboardInterrupt; it should just print a message
+    cli.main()
+
+    out = capsys.readouterr().out
+    assert "Aborted by user" in out  # or whatever message you chose
