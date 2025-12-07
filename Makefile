@@ -83,6 +83,10 @@ redevedit:
 	pipx uninstall $(PACKAGE) || true
 	pipx install -e .
 
+.PHONY: run
+run: 
+	python -m tbweightcalc.cli
+
 # -------------------------
 # Help
 # -------------------------
@@ -99,3 +103,4 @@ help:
 	@echo "  make clean      - Remove build artifacts"
 	@echo "  make reinstall  - Clean, build, and install wheel via pipx"
 	@echo "  make redevedit  - Reinstall editable version via pipx"
+	@echo "  make run        - Runs python -m tbweightcalc.cli directly"
