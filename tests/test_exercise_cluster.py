@@ -35,7 +35,6 @@ class TestExerciseCluster(unittest.TestCase):
         out = str(c)
         lines = out.strip().splitlines()
 
-
         # Expect at least one work set around 170 (top set)
         self.assertTrue(
             any("(3-5) x 5" in line and "170" in line for line in lines),
@@ -46,7 +45,6 @@ class TestExerciseCluster(unittest.TestCase):
         c = ExerciseCluster(week=3, exercise=ExerciseCluster.DEADLIFT, oneRepMax=400)
         out = str(c)
         lines = out.strip().splitlines()
-
 
         # Expect a heavy triple around 360 somewhere
         self.assertTrue(
@@ -81,7 +79,9 @@ class TestExerciseCluster(unittest.TestCase):
         self.assertIn("105", out)
         # Should show some plate breakdown (e.g. (45 x 2)), but not say "Bar"
         self.assertIn("45", out)
-        self.assertNotIn("Bar", out, msg="WPU should not include bar weight in description.")
+        self.assertNotIn(
+            "Bar", out, msg="WPU should not include bar weight in description."
+        )
 
     def test_get_item(self):
         # Cluster indexing should return individual sets in order
@@ -161,28 +161,32 @@ class TestExerciseCluster(unittest.TestCase):
         self.assertEqual(c[0], s1)
         self.assertEqual(c[1], s2)
 
-
     def test_calc_sets(self):
 
         # Custom weight sets.
-        s = ExerciseSet(weight=275) # Bar should be included in weight.
-        self.assertEqual(s.calc_plate_breakdown([45,25,10,5,2.5]), "(45 x 2) 25")
+        s = ExerciseSet(weight=275)  # Bar should be included in weight.
+        self.assertEqual(s.calc_plate_breakdown([45, 25, 10, 5, 2.5]), "(45 x 2) 25")
 
         s = ExerciseSet(weight=245)
-        self.assertEqual(s.calc_plate_breakdown([100,45,25,10,5,2.5]), "100")
-        
+        self.assertEqual(s.calc_plate_breakdown([100, 45, 25, 10, 5, 2.5]), "100")
+
         s = ExerciseSet(weight=45)
-        self.assertEqual(s.calc_plate_breakdown([45,25,10,5,2.5]), "Bar")
+        self.assertEqual(s.calc_plate_breakdown([45, 25, 10, 5, 2.5]), "Bar")
 
         s = ExerciseSet(weight=240)
-        self.assertEqual(s.calc_plate_breakdown([55,45,35,25,10,5,2.5]), "55 35 5 2.5")
+        self.assertEqual(
+            s.calc_plate_breakdown([55, 45, 35, 25, 10, 5, 2.5]), "55 35 5 2.5"
+        )
 
         s = ExerciseSet(bar_weight=35, weight=240)
-        self.assertEqual(s.calc_plate_breakdown([55,45,35,25,10,5,2.5]), "55 45 2.5")
+        self.assertEqual(
+            s.calc_plate_breakdown([55, 45, 35, 25, 10, 5, 2.5]), "55 45 2.5"
+        )
 
         # TODO: what happens if bad plate list is given? 1.24 24# etc? Must include 1.25 plates though.
         # s = ExerciseSet(weight=242.5)
         # self.assertEqual(s.calc_plate_breakdown([45,35,25,10,5,2.5, 1.25]), "???")
+
 
 #############
 # RUN TESTS #

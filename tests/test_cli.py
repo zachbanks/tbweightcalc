@@ -85,9 +85,7 @@ def test_build_program_markdown_pdf_uses_pagebreaks():
 # -------------------------------------------------------------------
 
 
-def test_main_prints_title_and_calls_markdown_to_pdf(
-    monkeypatch, capsys, tmp_path
-):
+def test_main_prints_title_and_calls_markdown_to_pdf(monkeypatch, capsys, tmp_path):
     """
     Test the full CLI main() without actually generating a PDF or hitting pbcopy.
     """
@@ -155,9 +153,7 @@ def test_main_prints_title_and_calls_markdown_to_pdf(
     assert called["markdown"]  # non-empty markdown content
 
 
-def test_main_uses_default_title_when_not_provided(
-    monkeypatch, capsys, tmp_path
-):
+def test_main_uses_default_title_when_not_provided(monkeypatch, capsys, tmp_path):
     """
     When --title is not passed, main() should use the default
     'Tactical Barbell Max Strength: YYYY-MM-DD'.
@@ -208,7 +204,6 @@ def test_main_uses_default_title_when_not_provided(
     assert pdf_path.exists()
 
 
-
 def test_main_interactive_text_only(monkeypatch, capsys):
     """
     When tbcalc is run with no CLI options, it should enter interactive mode.
@@ -224,15 +219,17 @@ def test_main_interactive_text_only(monkeypatch, capsys):
     monkeypatch.setattr(sys, "argv", ["tbcalc"])
 
     # Fake user inputs for input() prompts
-    inputs = iter([
-        "My Interactive Title",  # title
-        "455",                   # squat 1RM
-        "250",                   # bench 1RM
-        "",                      # deadlift (blank -> skip)
-        "",                      # weighted pull-up (blank -> skip)
-        "all",                   # week selection
-        "t",                     # output: text only
-    ])
+    inputs = iter(
+        [
+            "My Interactive Title",  # title
+            "455",  # squat 1RM
+            "250",  # bench 1RM
+            "",  # deadlift (blank -> skip)
+            "",  # weighted pull-up (blank -> skip)
+            "all",  # week selection
+            "t",  # output: text only
+        ]
+    )
 
     def fake_input(prompt: str = "") -> str:
         return next(inputs)
@@ -260,8 +257,8 @@ def test_main_interactive_text_only(monkeypatch, capsys):
     # Should print the title and some program content
     assert "My Interactive Title" in out
     assert "WEEK" in out.upper()
-    assert "455" in out     # squat
-    assert "250" in out     # bench
+    assert "455" in out  # squat
+    assert "250" in out  # bench
     # Deadlift and WPU were skipped, so no obvious WPU numbers
     # (you can tighten this if you want more specific checks)
 
@@ -276,20 +273,23 @@ def test_main_interactive_both_generates_pdf(monkeypatch, capsys, tmp_path):
 
     monkeypatch.setattr(sys, "argv", ["tbcalc"])
 
-    inputs = iter([
-        "",          # title (blank -> default title)
-        "455",       # squat
-        "250",       # bench
-        "300",       # deadlift
-        "",          # WPU (skip)
-        "1",         # week = 1 only
-        "b",         # output: both (text + pdf)
-    ])
+    inputs = iter(
+        [
+            "",  # title (blank -> default title)
+            "455",  # squat
+            "250",  # bench
+            "300",  # deadlift
+            "",  # WPU (skip)
+            "1",  # week = 1 only
+            "b",  # output: both (text + pdf)
+        ]
+    )
 
     def fake_input(prompt: str = "") -> str:
         return next(inputs)
 
     import builtins
+
     monkeypatch.setattr(builtins, "input", fake_input)
     monkeypatch.setattr(cli, "copy_to_clipboard", lambda text: None)
 
@@ -320,8 +320,6 @@ def test_main_interactive_both_generates_pdf(monkeypatch, capsys, tmp_path):
     assert "markdown" in pdf_call
     assert pdf_call["markdown"]  # non-empty markdown
     assert pdf_call["title"] is not None
-    
-
 
 
 def test_main_interactive_ctrl_c_exits_cleanly(monkeypatch, capsys):

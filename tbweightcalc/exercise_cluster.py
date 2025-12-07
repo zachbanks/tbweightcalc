@@ -1,6 +1,7 @@
 from .exercise_set import ExerciseSet
 from .program import apply_markdown
 
+
 class ExerciseCluster:
     SQUAT = "squat"
     BENCHPRESS = "bench press"

@@ -151,6 +151,7 @@ def build_program_markdown(args: argparse.Namespace, for_pdf: bool = False) -> s
 
     return "\n".join(lines).rstrip()
 
+
 def run_interactive() -> None:
     """
     Interactive mode when tbcalc is run with no CLI options.
@@ -198,9 +199,7 @@ def run_interactive() -> None:
         week = week_input
 
     # --- Output mode ---
-    out_mode = input(
-        "Output: [t]ext, [p]df, [b]oth (default b): "
-    ).strip().lower()
+    out_mode = input("Output: [t]ext, [p]df, [b]oth (default b): ").strip().lower()
     if out_mode not in ("t", "p", "b"):
         out_mode = "b"
 
@@ -280,9 +279,7 @@ def run_interactive() -> None:
         week = week_input
 
     # --- Output mode ---
-    out_mode = input(
-        "Output: [t]ext, [p]df, [b]oth (default b): "
-    ).strip().lower()
+    out_mode = input("Output: [t]ext, [p]df, [b]oth (default b): ").strip().lower()
     if out_mode not in ("t", "p", "b"):
         out_mode = "b"
 
@@ -313,6 +310,7 @@ def run_interactive() -> None:
         pdf_path.parent.mkdir(parents=True, exist_ok=True)
         markdown_to_pdf(pdf_body, str(pdf_path), title=title)
         print(f"\n[PDF saved to: {pdf_path}]")
+
 
 # -------------------------------------------------------------------
 # Main CLI entry point
