@@ -7,6 +7,7 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
+import sys
 
 
 # -------------------------------------------------------------------
@@ -150,6 +151,168 @@ def build_program_markdown(args: argparse.Namespace, for_pdf: bool = False) -> s
 
     return "\n".join(lines).rstrip()
 
+def run_interactive() -> None:
+    """
+    Interactive mode when tbcalc is run with no CLI options.
+    Asks for title, 1RMs, week selection, and output mode (text/pdf/both).
+    """
+    print("Tactical Barbell Max Strength - Interactive Mode\n")
+
+    # --- Title ---
+    raw_title = input("Program title (leave blank for default): ").strip()
+    if raw_title:
+        title = raw_title
+    else:
+        title = f"Tactical Barbell Max Strength: {datetime.date.today():%Y-%m-%d}"
+
+    # --- 1RMs ---
+    def ask_1rm(label: str) -> int | None:
+        s = input(f"{label} 1RM (leave blank to skip): ").strip()
+        return int(s) if s else None
+
+    squat = ask_1rm("Squat")
+    bench = ask_1rm("Bench press")
+    deadlift = ask_1rm("Deadlift")
+
+    # Weighted pull-up: 1RM + bodyweight
+    wpu_raw = input(
+        "Weighted pull-up 1RM and bodyweight (e.g. '245 200', leave blank to skip): "
+    ).strip()
+    weighted_pullup: list[int] | None
+    if wpu_raw:
+        parts = wpu_raw.split()
+        try:
+            one_rm = int(parts[0])
+            bodyweight = int(parts[1]) if len(parts) > 1 else None
+            weighted_pullup = [one_rm, bodyweight] if bodyweight is not None else None
+        except ValueError:
+            weighted_pullup = None
+    else:
+        weighted_pullup = None
+
+    # --- Week selection ---
+    week_input = input("Week (1–6 or 'all', default 'all'): ").strip().lower()
+    if not week_input:
+        week = "all"
+    else:
+        week = week_input
+
+    # --- Output mode ---
+    out_mode = input(
+        "Output: [t]ext, [p]df, [b]oth (default b): "
+    ).strip().lower()
+    if out_mode not in ("t", "p", "b"):
+        out_mode = "b"
+
+    # Build an argparse-like Namespace so we can reuse existing code
+    args = argparse.Namespace(
+        week=week,
+        squat=squat,
+        bench=bench,
+        deadlift=deadlift,
+        weighted_pullup=weighted_pullup,
+        onerm=None,
+        title=title,
+        pdf=None,
+    )
+
+    # ---------- Text output ----------
+    screen_body = build_program_markdown(args, for_pdf=False)
+    screen_output = f"# {title}\n\n{screen_body}"
+
+    if out_mode in ("t", "b"):
+        print(screen_output)
+        copy_to_clipboard(screen_output)
+
+    # ---------- PDF output ----------
+    if out_mode in ("p", "b"):
+        pdf_body = build_program_markdown(args, for_pdf=True)
+        pdf_path = default_pdf_path(title)
+        pdf_path.parent.mkdir(parents=True, exist_ok=True)
+        markdown_to_pdf(pdf_body, str(pdf_path), title=title)
+        print(f"\n[PDF saved to: {pdf_path}]")
+
+
+def run_interactive() -> None:
+    """
+    Interactive mode when tbcalc is run with no CLI options.
+    Asks for title, 1RMs, week selection, and output mode (text/pdf/both).
+    """
+    print("Tactical Barbell Max Strength - Interactive Mode\n")
+
+    # --- Title ---
+    raw_title = input("Program title (leave blank for default): ").strip()
+    if raw_title:
+        title = raw_title
+    else:
+        title = f"Tactical Barbell Max Strength: {datetime.date.today():%Y-%m-%d}"
+
+    # --- 1RMs ---
+    def ask_1rm(label: str) -> int | None:
+        s = input(f"{label} 1RM (leave blank to skip): ").strip()
+        return int(s) if s else None
+
+    squat = ask_1rm("Squat")
+    bench = ask_1rm("Bench press")
+    deadlift = ask_1rm("Deadlift")
+
+    # Weighted pull-up: 1RM + bodyweight
+    wpu_raw = input(
+        "Weighted pull-up 1RM and bodyweight (e.g. '245 200', leave blank to skip): "
+    ).strip()
+    weighted_pullup: list[int] | None
+    if wpu_raw:
+        parts = wpu_raw.split()
+        try:
+            one_rm = int(parts[0])
+            bodyweight = int(parts[1]) if len(parts) > 1 else None
+            weighted_pullup = [one_rm, bodyweight] if bodyweight is not None else None
+        except ValueError:
+            weighted_pullup = None
+    else:
+        weighted_pullup = None
+
+    # --- Week selection ---
+    week_input = input("Week (1–6 or 'all', default 'all'): ").strip().lower()
+    if not week_input:
+        week = "all"
+    else:
+        week = week_input
+
+    # --- Output mode ---
+    out_mode = input(
+        "Output: [t]ext, [p]df, [b]oth (default b): "
+    ).strip().lower()
+    if out_mode not in ("t", "p", "b"):
+        out_mode = "b"
+
+    # Build an argparse-like Namespace so we can reuse existing functions
+    args = argparse.Namespace(
+        week=week,
+        squat=squat,
+        bench=bench,
+        deadlift=deadlift,
+        weighted_pullup=weighted_pullup,
+        onerm=None,
+        title=title,
+        pdf=None,
+    )
+
+    # ---------- Text output ----------
+    screen_body = build_program_markdown(args, for_pdf=False)
+    screen_output = f"# {title}\n\n{screen_body}"
+
+    if out_mode in ("t", "b"):
+        print(screen_output)
+        copy_to_clipboard(screen_output)
+
+    # ---------- PDF output ----------
+    if out_mode in ("p", "b"):
+        pdf_body = build_program_markdown(args, for_pdf=True)
+        pdf_path = default_pdf_path(title)
+        pdf_path.parent.mkdir(parents=True, exist_ok=True)
+        markdown_to_pdf(pdf_body, str(pdf_path), title=title)
+        print(f"\n[PDF saved to: {pdf_path}]")
 
 # -------------------------------------------------------------------
 # Main CLI entry point
@@ -201,6 +364,9 @@ def main() -> None:
         "--pdf",
         help="Optional explicit path for the PDF output; defaults to ~/Downloads/<title>.pdf",
     )
+    if len(sys.argv) == 1:
+        run_interactive()
+        return
 
     args = parser.parse_args()
 

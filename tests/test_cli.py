@@ -1,5 +1,6 @@
 import argparse
 from pathlib import Path
+import sys
 
 import tbweightcalc.cli as cli
 
@@ -204,3 +205,117 @@ def test_main_uses_default_title_when_not_provided(
     assert called["title"].startswith("Tactical Barbell Max Strength:")
     assert Path(called["output_path"]) == pdf_path
     assert pdf_path.exists()
+
+
+
+def test_main_interactive_text_only(monkeypatch, capsys):
+    """
+    When tbcalc is run with no CLI options, it should enter interactive mode.
+
+    In this scenario the user:
+      - provides a title
+      - provides squat & bench 1RMs
+      - skips deadlift & WPU
+      - chooses text-only output
+    """
+
+    # Simulate: tbcalc  (no args)
+    monkeypatch.setattr(sys, "argv", ["tbcalc"])
+
+    # Fake user inputs for input() prompts
+    inputs = iter([
+        "My Interactive Title",  # title
+        "455",                   # squat 1RM
+        "250",                   # bench 1RM
+        "",                      # deadlift (blank -> skip)
+        "",                      # weighted pull-up (blank -> skip)
+        "all",                   # week selection
+        "t",                     # output: text only
+    ])
+
+    def fake_input(prompt: str = "") -> str:
+        return next(inputs)
+
+    import builtins
+
+    monkeypatch.setattr(builtins, "input", fake_input)
+
+    # Avoid touching system clipboard in tests
+    monkeypatch.setattr(cli, "copy_to_clipboard", lambda text: None)
+
+    # Track whether markdown_to_pdf gets called (it should NOT for text-only)
+    called = {"pdf": False}
+
+    def fake_markdown_to_pdf(markdown: str, output_path: str, title: str | None = None):
+        called["pdf"] = True
+
+    monkeypatch.setattr(cli, "markdown_to_pdf", fake_markdown_to_pdf)
+
+    # Run main()
+    cli.main()
+
+    out = capsys.readouterr().out
+
+    # Should print the title and some program content
+    assert "My Interactive Title" in out
+    assert "WEEK" in out.upper()
+    assert "455" in out     # squat
+    assert "250" in out     # bench
+    # Deadlift and WPU were skipped, so no obvious WPU numbers
+    # (you can tighten this if you want more specific checks)
+
+    # In text-only mode, we should NOT generate a PDF
+    assert called["pdf"] is False
+
+
+def test_main_interactive_both_generates_pdf(monkeypatch, capsys, tmp_path):
+    """
+    Interactive mode with 'both' output should still call markdown_to_pdf.
+    """
+
+    monkeypatch.setattr(sys, "argv", ["tbcalc"])
+
+    inputs = iter([
+        "",          # title (blank -> default title)
+        "455",       # squat
+        "250",       # bench
+        "300",       # deadlift
+        "",          # WPU (skip)
+        "1",         # week = 1 only
+        "b",         # output: both (text + pdf)
+    ])
+
+    def fake_input(prompt: str = "") -> str:
+        return next(inputs)
+
+    import builtins
+    monkeypatch.setattr(builtins, "input", fake_input)
+    monkeypatch.setattr(cli, "copy_to_clipboard", lambda text: None)
+
+    # Capture markdown_to_pdf arguments
+    pdf_call = {}
+
+    def fake_markdown_to_pdf(markdown: str, output_path: str, title: str | None = None):
+        pdf_call["markdown"] = markdown
+        pdf_call["output_path"] = output_path
+        pdf_call["title"] = title
+        # Simulate file creation
+        Path(output_path).write_bytes(b"%PDF-FAKE%")
+
+    monkeypatch.setattr(cli, "markdown_to_pdf", fake_markdown_to_pdf)
+
+    cli.main()
+
+    out = capsys.readouterr().out
+
+    # Should print some text for week 1 with the right lifts
+    assert "Week 1" in out or "WEEK 1" in out.upper()
+    assert "455" in out
+    assert "250" in out
+    assert "300" in out
+
+    # PDF generation should have been invoked
+    assert "output_path" in pdf_call
+    assert "markdown" in pdf_call
+    assert pdf_call["markdown"]  # non-empty markdown
+    assert pdf_call["title"] is not None
