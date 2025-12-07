@@ -65,6 +65,15 @@ def build_program_markdown(args: argparse.Namespace, for_pdf: bool = False) -> s
     """
     lines: list[str] = []
 
+    week_percentages = {
+        1: "70%",
+        2: "80%",
+        3: "90%",
+        4: "75%",
+        5: "85%",
+        6: "95%",
+    }
+
     # If week is specified as single week, use that; if "all" or None, do 1–6.
     if args.week and args.week != "all":
         weeks = [int(args.week)]
@@ -73,7 +82,7 @@ def build_program_markdown(args: argparse.Namespace, for_pdf: bool = False) -> s
 
     for week in weeks:
         # Week header
-        lines.append(apply_markdown(f"WEEK {week}", "h2"))
+        lines.append(apply_markdown(f"WEEK {week} - {week_percentages[week]}", "h2"))
         lines.append("")
 
         # Squat
