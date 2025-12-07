@@ -118,7 +118,7 @@ class ExerciseSet:
         if available_plates is None:
             plates = [45, 35, 25, 15, 10, 5, 2.5]
         else:
-            plates = sorted(available_plates)
+            plates = sorted(available_plates, reverse=True)
         plate_count = [0] * len(plates)  # Initial array with same number of plates in plates array
 
         if corrected_weight > self.bar_weight and self.bar == True:
