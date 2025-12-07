@@ -216,8 +216,8 @@ def markdown_to_pdf(md_text: str, output_path: str, title: str | None = None):
         "-V", "header-includes=\\setlength{\\droptitle}{-7em}",
 
         # Coding-style font + layout
-        "-V", "mainfont=JetBrains Mono",
-        "-V", "monofont=JetBrains Mono",
+        "-V", "mainfont=JetBrainsMono Nerd Font Mono",
+        "-V", "monofont=JetBrainsMono Nerd Font Mono",
         "-V", "fontsize=12pt",
         "-V", "geometry:margin=1in",
 
