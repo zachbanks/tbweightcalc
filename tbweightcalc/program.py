@@ -196,6 +196,7 @@ def markdown_to_pdf(md_text: str, output_path: str, title: str | None = None):
         tmp.write(md_for_pdf.encode("utf-8"))
         tmp_path = tmp.name
 
+    title = f"\\Huge\\textbf{{{title}}}"
     cmd = [
         "pandoc",
         "-f",
