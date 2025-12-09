@@ -346,3 +346,55 @@ def test_main_interactive_ctrl_c_exits_cleanly(monkeypatch, capsys):
 
     out = capsys.readouterr().out
     assert "Aborted by user" in out  # or whatever message you chose
+
+
+def test_prompt_one_rm(monkeypatch, capsys):
+    inputs = iter(["275", "5"])
+
+    def fake_input(prompt: str = "") -> str:
+        return next(inputs)
+
+    monkeypatch.setattr(builtins, "input", fake_input)
+
+    cli.prompt_one_rm()
+
+    out = capsys.readouterr().out
+    assert "Estimated 1RM" in out
+    assert "321" in out
+
+
+def test_prompt_one_rm_copies_numeric_result_to_clipboard(monkeypatch, capsys):
+    """
+    prompt_one_rm should:
+      - read weight & reps from input()
+      - print the estimated 1RM
+      - copy ONLY the numeric 1RM to the clipboard
+    """
+
+    # Simulate user typing: weight=275, reps=5
+    inputs = iter(["275", "5"])
+
+    def fake_input(prompt: str = "") -> str:
+        return next(inputs)
+
+    monkeypatch.setattr(builtins, "input", fake_input)
+
+    copied = {}
+
+    def fake_copy(text: str) -> None:
+        copied["value"] = text
+
+    # Avoid touching the real clipboard
+    monkeypatch.setattr(cli, "copy_to_clipboard", fake_copy)
+
+    # Run the prompt
+    cli.prompt_one_rm()
+
+    out = capsys.readouterr().out
+
+    # 275 x 5 with your Epley + rounding logic -> 321 lb
+    assert "Estimated 1RM" in out
+    assert "321 lb" in out
+
+    # Clipboard should contain ONLY the number "321"
+    assert copied["value"] == "321"

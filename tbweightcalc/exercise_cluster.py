@@ -116,6 +116,7 @@ class ExerciseCluster:
                 ]
 
                 # If bench, change multiplier values
+                # TODO: Does this even get called?
                 if self.exercise == ExerciseCluster.BENCHPRESS:
                     bench_values = [0.0, 0.5, 0.7, 0.9]
                     i = 0

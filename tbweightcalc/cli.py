@@ -2,6 +2,7 @@ import argparse
 import datetime
 import tbweightcalc as tb
 from tbweightcalc.program import apply_markdown, markdown_to_pdf
+from tbweightcalc.onerm import calculate_one_rm
 import os
 import re
 import shutil
@@ -345,12 +346,18 @@ def main() -> None:
         nargs=2,
     )
 
+    # -------------- 1RM FLAG --------------
     parser.add_argument(
-        "--1rm",
-        help="Enter weight lifted and number of reps",
+        "-1rm",
+        "--onerepmax",
+        nargs="*",
         type=int,
-        nargs=2,
-        dest="onerm",
+        dest="onerepmax",
+        metavar=("WEIGHT", "REPS"),
+        help=(
+            "Estimate 1RM. Usage: --onerepmax 300 5 OR just --onerepmax "
+            "to enter interactive 1RM mode."
+        ),
     )
 
     parser.add_argument(
@@ -372,6 +379,31 @@ def main() -> None:
         return
 
     args = parser.parse_args()
+
+    # ----------- 1RM MODE (FLAG GIVEN) -----------
+    if args.onerepmax is not None:
+        # Case 1: Flag given but NO numbers → interactive 1RM
+        if len(args.onerepmax) == 0:
+            prompt_one_rm()
+            return
+
+        # Case 2: Flag given with EXACTLY 2 args → compute 1RM
+        if len(args.onerepmax) == 2:
+            weight, reps = args.onerepmax
+
+            est = calculate_one_rm(weight, reps)
+            print(f"Estimated 1RM for {weight} x {reps}: {est} lb")
+
+            # Copy numeric 1RM to clipboard
+            copy_to_clipboard(str(est))
+            print("[Copied 1RM to clipboard]")
+
+            return
+
+        # Case 3: Incorrect usage (wrong number of args)
+        parser.error(
+            "-1rm/--onerepmax expects either NOTHING or exactly TWO arguments: WEIGHT REPS"
+        )
 
     # Decide title
     if args.title:
@@ -407,6 +439,34 @@ def main() -> None:
 
     # Echo where the PDF went
     print(f"\n[PDF saved to: {pdf_path}]")
+
+
+def prompt_one_rm() -> None:
+    """
+    Simple interactive 1RM prompt:
+
+    - Asks for weight (lbs)
+    - Asks for reps
+    - Prints estimated 1RM (rounded to nearest lb)
+    - Copies the numeric 1RM to the clipboard
+    """
+    print("=== 1RM Estimator (Epley) ===")
+    try:
+        raw_weight = input("Enter weight lifted (in pounds): ").strip()
+        raw_reps = input("Enter number of reps: ").strip()
+
+        weight = float(raw_weight)
+        reps = int(raw_reps)
+
+        est = calculate_one_rm(weight, reps)
+        print(f"\nEstimated 1RM: {est} lb")
+
+        # Copy number only 1RM to clipboard
+        copy_to_clipboard(str(est))
+    except ValueError as e:
+        print(f"\nInvalid input: {e}")
+    except KeyboardInterrupt:
+        print("\n[Aborted by user]")
 
 
 if __name__ == "__main__":
