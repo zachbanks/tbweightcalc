@@ -424,6 +424,16 @@ class TestParseOneRmString:
         assert cli.parse_one_rm_string("240 x") is None
         assert cli.parse_one_rm_string("240 5 3") is None
 
+    def test_reps_with_x_separator_and_spaces(self):
+        # Base expectation using '240x5'
+        base = cli.parse_one_rm_string("240x5")
+        assert base is not None
+
+        # Variants that should behave identically
+        assert cli.parse_one_rm_string("240 x5") == base
+        assert cli.parse_one_rm_string("240x 5") == base
+        assert cli.parse_one_rm_string("240 x 5") == base
+
 
 import builtins
 
@@ -495,6 +505,16 @@ class TestParseWeightedPullupString:
         assert cli.parse_weighted_pullup_string(bw, "35x") is None
         assert cli.parse_weighted_pullup_string(bw, "x4") is None
         assert cli.parse_weighted_pullup_string(bw, "35 4 x") is None
+
+    def test_numeric_x_separator_with_spaces(self):
+        bw = 200
+
+        base = cli.parse_weighted_pullup_string(bw, "35x4")
+        assert base is not None
+
+        assert cli.parse_weighted_pullup_string(bw, "35 x4") == base
+        assert cli.parse_weighted_pullup_string(bw, "35x 4") == base
+        assert cli.parse_weighted_pullup_string(bw, "35 x 4") == base
 
 
 class TestPromptWeightedPullupInteractive:

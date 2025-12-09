@@ -167,17 +167,18 @@ def parse_one_rm_string(raw: str) -> int | None:
     Parse generic 1RM input string.
 
     Accepts:
-      - '' or whitespace -> None
-      - '455'            -> 455 (assumed true 1RM)
-      - '240 5'          -> estimate 1RM from 240 x 5
-      - '240x5', '240X5' -> same as above
+      - '' or whitespace        -> None
+      - '455'                   -> 455 (assumed true 1RM)
+      - '240 5'                 -> estimate 1RM from 240 x 5
+      - '240x5', '240 x5',
+        '240x 5', '240 x 5'     -> same as above
     """
     raw = raw.strip()
     if not raw:
         return None
 
-    # '240x5' or '240X5'
-    m = re.match(r"^(\d+)[xX](\d+)$", raw)
+    # '240x5' / '240 x5' / '240x 5' / '240 x 5'
+    m = re.match(r"^(\d+)\s*[xX]\s*(\d+)$", raw)
     if m:
         weight = float(m.group(1))
         reps = int(m.group(2))
@@ -207,10 +208,12 @@ def parse_weighted_pullup_string(bodyweight: int, raw: str) -> int | None:
     raw: one of:
       - '' or whitespace                -> returns None
       - '35 4'                          -> +35 lb for 4 reps
-      - '35x4' or '35X4'                -> +35 lb for 4 reps
+      - '35x4', '35 x4',
+        '35x 4', '35 x 4'               -> +35 lb for 4 reps
       - '0 4'                           -> bodyweight-only for 4 reps
       - 'bw'                            -> bodyweight-only for 1 rep
-      - 'bwx4', 'bw x 4', 'bw 4'        -> bodyweight-only for 4 reps
+      - 'bwx4', 'bw x4', 'bw x 4',
+        'bw 4'                          -> bodyweight-only for 4 reps
       - '45'                            -> +45 lb for 1 rep
 
     Returns:
@@ -231,7 +234,7 @@ def parse_weighted_pullup_string(bodyweight: int, raw: str) -> int | None:
         added = 0
         reps = 1
     else:
-        # "bwx4", "bw x 4", "bw 4"
+        # "bwx4", "bw x4", "bw x 4", "bw 4"
         m_bw = re.match(r"^bw\s*[xX]?\s*(\d+)$", lower)
         if m_bw:
             added = 0
@@ -239,8 +242,8 @@ def parse_weighted_pullup_string(bodyweight: int, raw: str) -> int | None:
         else:
             # --- Numeric styles ---
 
-            # '35x4' or '35X4'
-            m = re.match(r"^(\d+)[xX](\d+)$", raw)
+            # '35x4', '35 x4', '35x 4', '35 x 4'
+            m = re.match(r"^(\d+)\s*[xX]\s*(\d+)$", raw)
             if m:
                 added = int(m.group(1))
                 reps = int(m.group(2))
