@@ -3,10 +3,6 @@ from __future__ import annotations
 import os
 import pathlib
 from dataclasses import dataclass, field
-
-import jinja2
-import weasyprint
-
 import re
 
 
@@ -52,7 +48,9 @@ class Program:
         return target_path
 
     @classmethod
-    def print_exercise(cls, exercise, oneRepMax, week="all", body_weight=None, print_1rm=True):
+    def print_exercise(
+        cls, exercise, oneRepMax, week="all", body_weight=None, print_1rm=True
+    ):
         from .exercise_cluster import ExerciseCluster
 
         """
@@ -60,8 +58,8 @@ class Program:
         If week="all", returns all 6 weeks concatenated.
         """
 
-        output_lines = []     # ← collect output instead of printing
-        clusters = []         # ← stores ExerciseCluster objects
+        output_lines = []  # ← collect output instead of printing
+        clusters = []  # ← stores ExerciseCluster objects
 
         # Build clusters
         if week is None:
@@ -109,7 +107,6 @@ class Program:
         # Return final string
         return "\n".join(output_lines)
 
-
     @staticmethod
     def calc_1rm(weight: int, reps: int = 1):
         """Calculates 1RM using Brzycki Equation"""
@@ -123,7 +120,6 @@ MARKDOWN_STYLES = {
     "italic": ("*", "*"),
     "code": ("`", "`"),
     "strikethrough": ("~~", "~~"),
-
     # Heading styles (prefix-only; suffix is None)
     "h1": ("# ", None),
     "h2": ("## ", None),
@@ -131,7 +127,6 @@ MARKDOWN_STYLES = {
     "h4": ("#### ", None),
     "h5": ("##### ", None),
     "h6": ("###### ", None),
-
     "hr": ("---", None),
     "ul": ("- ", None),
 }
@@ -172,6 +167,7 @@ def apply_markdown(text: str, style: str, styles: dict | None = None) -> str:
     # Surrounding style (e.g. bold, italic, code)
     return f"{prefix}{text}{suffix}"
 
+
 import datetime
 import subprocess
 import tempfile
@@ -200,6 +196,7 @@ def markdown_to_pdf(md_text: str, output_path: str, title: str | None = None):
         tmp.write(md_for_pdf.encode("utf-8"))
         tmp_path = tmp.name
 
+    title = f"\\Huge\\textbf{{{title}}}"
     cmd = [
         "pandoc",
         "-f",
@@ -208,19 +205,22 @@ def markdown_to_pdf(md_text: str, output_path: str, title: str | None = None):
         "-o",
         output_path,
         "--pdf-engine=xelatex",
-
         # Big centered title
         "-V",
         f"title={title}",
-        "-V", "header-includes=\\usepackage{titling}",
-        "-V", "header-includes=\\setlength{\\droptitle}{-7em}",
-
+        "-V",
+        "header-includes=\\usepackage{titling}",
+        "-V",
+        "header-includes=\\setlength{\\droptitle}{-7em}",
         # Coding-style font + layout
-        "-V", "mainfont=JetBrainsMono Nerd Font Mono",
-        "-V", "monofont=JetBrainsMono Nerd Font Mono",
-        "-V", "fontsize=12pt",
-        "-V", "geometry:margin=1in",
-
+        "-V",
+        "mainfont=JetBrainsMono Nerd Font Mono",
+        "-V",
+        "monofont=JetBrainsMono Nerd Font Mono",
+        "-V",
+        "fontsize=12pt",
+        "-V",
+        "geometry:margin=1in",
         # fancyhdr: footer only, no header rule
         "-V",
         "header-includes=\\usepackage{fancyhdr}",
@@ -230,13 +230,11 @@ def markdown_to_pdf(md_text: str, output_path: str, title: str | None = None):
         "header-includes=\\fancyhf{}",  # clear default header/footer
         "-V",
         "header-includes=\\renewcommand{\\headrulewidth}{0pt}",  # ❗ no top line
-
         # normal pages footer
         "-V",
         f"header-includes=\\fancyfoot[L]{{Generated {footer_date}}}",
         "-V",
         "header-includes=\\fancyfoot[R]{Page \\thepage}",
-
         # title/plain pages: same footer + no headrule
         "-V",
         (
