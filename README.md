@@ -77,4 +77,7 @@ pipx install tbweightcalc
 
 
 ## Upgrade
-To upgrade to the latest version, run ```pipx upgrade tbweightcalc```
+To upgrade to the latest version, run 
+```bash
+pipx upgrade tbweightcalc
+```
