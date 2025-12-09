@@ -87,3 +87,4 @@ Run:
 
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/zachbanks/tbweightcalc/main/install_tbcalc.sh)"
+```
