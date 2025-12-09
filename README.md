@@ -74,3 +74,7 @@ pipx install tbweightcalc
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/zachbanks/tbweightcalc/main/install_tbcalc.sh)"
 ```
+
+
+## Upgrade
+To upgrade to the latest version, run ```pipx upgrade tbweightcalc```
