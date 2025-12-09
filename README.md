@@ -41,21 +41,17 @@ TBWeightCalc requires the following system dependencies:
 
 ### **Required**
 - Python **3.10+**
-- **pipx** (recommended installation method)
+- **pipx**
 - **Pandoc**
-- **XeLaTeX** (BasicTeX installation)
-- LaTeX packages:
-  - `fancyhdr`
-  - `titling`
+- **XeLaTeX**
+- LaTeX packages `fancyhdr` + `titling`
 - **JetBrainsMono Nerd Font Mono**
 
-Below are full instructions for installing on a brand-new Mac.
+Below are the macOS install steps.
 
 ---
 
-## 1️⃣ Install pipx (recommended)
-
-pipx installs CLI tools globally *without* modifying your system Python.
+## 1️⃣ Manual Developer Installation (macOS)
 
 ```bash
 brew install pipx
@@ -68,23 +64,7 @@ source ~/.zshrc
 
 sudo tlmgr update --self
 sudo tlmgr install fancyhdr titling
+
 brew install --cask font-jetbrains-mono-nerd-font
+
 pipx install tbweightcalc
-
-Usage
-tbcalc -dl 300 -sq 455 -bp 250 -wpu 252 210 --title "TB 2025-03"
-
-
-## Installation (macOS / Ubuntu with pipx)
-
-This script will:
-
-- Install system dependencies (pandoc, LaTeX engine, JetBrainsMono Nerd Font)
-- Install `pipx` (if needed)
-- Install `tbcalc` so it’s available as a global command
-
-Run:
-
-```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/zachbanks/tbweightcalc/main/install_tbcalc.sh)"
-```
