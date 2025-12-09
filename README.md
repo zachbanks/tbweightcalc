@@ -73,3 +73,17 @@ pipx install tbweightcalc
 
 Usage
 tbcalc -dl 300 -sq 455 -bp 250 -wpu 252 210 --title "TB 2025-03"
+
+
+## Installation (macOS / Ubuntu with pipx)
+
+This script will:
+
+- Install system dependencies (pandoc, LaTeX engine, JetBrainsMono Nerd Font)
+- Install `pipx` (if needed)
+- Install `tbcalc` so it’s available as a global command
+
+Run:
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/zachbanks/tbweightcalc/main/install_tbcalc.sh)"
