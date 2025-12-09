@@ -398,3 +398,181 @@ def test_prompt_one_rm_copies_numeric_result_to_clipboard(monkeypatch, capsys):
 
     # Clipboard should contain ONLY the number "321"
     assert copied["value"] == "321"
+
+
+class TestParseOneRmString:
+    def test_blank_returns_none(self):
+        assert cli.parse_one_rm_string("") is None
+        assert cli.parse_one_rm_string("   ") is None
+
+    def test_single_integer_treated_as_known_1rm(self):
+        assert cli.parse_one_rm_string("455") == 455
+        assert cli.parse_one_rm_string("  300  ") == 300
+
+    def test_weight_and_reps_space_separated(self):
+        # 240 x 5 -> Epley: 240 * (1 + 5/30) = 240 * 7/6 = 280
+        result = cli.parse_one_rm_string("240 5")
+        assert result == 280
+
+    def test_weight_and_reps_with_x_separator(self):
+        # 240x5 -> 280 as above
+        assert cli.parse_one_rm_string("240x5") == 280
+        assert cli.parse_one_rm_string("240X5") == 280
+
+    def test_invalid_input_returns_none(self):
+        assert cli.parse_one_rm_string("abc") is None
+        assert cli.parse_one_rm_string("240 x") is None
+        assert cli.parse_one_rm_string("240 5 3") is None
+
+
+class TestParseWeightedPullupString:
+    def test_blank_returns_none(self):
+        assert cli.parse_weighted_pullup_string(200, "") is None
+        assert cli.parse_weighted_pullup_string(200, "   ") is None
+
+    def test_added_weight_and_reps_space_separated(self):
+        # BW = 200, +35 x 4 reps
+        # total = 235
+        # 1RM = 235 * (1 + 4/30) = 235 * 34/30 ≈ 266.33 -> 266
+        result = cli.parse_weighted_pullup_string(200, "35 4")
+        assert result == 266
+
+    def test_added_weight_and_reps_with_x_separator(self):
+        # Same as above, but "35x4"
+        result = cli.parse_weighted_pullup_string(200, "35x4")
+        assert result == 266
+
+    def test_bodyweight_only_reps(self):
+        # BW = 200, +0 x 4 reps
+        # total = 200
+        # 1RM = 200 * (1 + 4/30) = 200 * 34/30 ≈ 226.67 -> 227
+        result = cli.parse_weighted_pullup_string(200, "0 4")
+        assert result == 227
+
+        result = cli.parse_weighted_pullup_string(200, "0x4")
+        assert result == 227
+
+        # lowercase bw
+        result = cli.parse_weighted_pullup_string(200, "bwx4")
+        assert result == 227
+
+        # uppercase x
+        result = cli.parse_weighted_pullup_string(200, "bwX4")
+        assert result == 227
+
+        # uppercase bw
+        result = cli.parse_weighted_pullup_string(200, "bwx4")
+        assert result == 227
+
+        # mixedcase bw
+        result = cli.parse_weighted_pullup_string(200, "bWx4")
+        assert result == 227
+
+        # spaced out format
+        result = cli.parse_weighted_pullup_string(200, "bw x 4")
+        assert result == 227
+
+        # space instead of x format
+        result = cli.parse_weighted_pullup_string(200, "bw 4")
+        assert result == 227
+
+        result = cli.parse_weighted_pullup_string(200, "BW 4")
+        assert result == 227
+
+        result = cli.parse_weighted_pullup_string(200, "Bw 4")
+        assert result == 227
+
+    def test_invalid_input_returns_none(self):
+        assert cli.parse_weighted_pullup_string(200, "abc") is None
+        assert cli.parse_weighted_pullup_string(200, "35 x") is None
+        assert cli.parse_weighted_pullup_string(200, "35 4 2") is None
+
+
+import builtins
+import sys
+
+from tbweightcalc import cli
+
+
+def test_prompt_lift_one_rm_reprompts_on_invalid(monkeypatch, capsys):
+    """
+    If the user enters invalid data for a lift 1RM/set, the prompt should
+    re-ask until the user enters something valid or leaves it blank.
+    """
+
+    # Inputs:
+    #   1) "abc"      -> invalid
+    #   2) "240x5"    -> valid (Epley: 240 * (1 + 5/30) = 280)
+    inputs = iter(["abc", "240x5"])
+
+    def fake_input(prompt: str = "") -> str:
+        return next(inputs)
+
+    monkeypatch.setattr(builtins, "input", fake_input)
+
+    result = cli.prompt_lift_one_rm("Squat")
+
+    out = capsys.readouterr().out
+
+    # Should have printed an error message once
+    assert "Could not parse input for 'Squat'" in out
+    # And eventually return the computed 1RM
+    assert result == 280
+
+
+def test_prompt_weighted_pullup_interactive_reprompts_bodyweight(monkeypatch, capsys):
+    """
+    If the user enters invalid bodyweight, the prompt should re-ask
+    until a valid integer or blank.
+    """
+
+    # Inputs:
+    #   1) "45x3"   -> invalid bodyweight
+    #   2) "200"    -> valid bodyweight
+    #   3) ""       -> skip WPU after bodyweight entry
+    inputs = iter(["45x3", "200", ""])
+
+    def fake_input(prompt: str = "") -> str:
+        return next(inputs)
+
+    monkeypatch.setattr(builtins, "input", fake_input)
+
+    one_rm, bw = cli.prompt_weighted_pullup_interactive()
+
+    out = capsys.readouterr().out
+
+    # First invalid BW should trigger error message
+    assert "Invalid bodyweight" in out
+
+    # Final result: no WPU 1RM, but bodyweight is recorded
+    assert one_rm is None
+    assert bw == 200
+
+
+def test_prompt_weighted_pullup_interactive_reprompts_wpu_set(monkeypatch, capsys):
+    """
+    If the user enters invalid WPU set after bodyweight, it should re-ask
+    until valid or blank.
+    """
+
+    # bodyweight = 200
+    # WPU inputs:
+    #   1) "foobar" -> invalid
+    #   2) "35 4"   -> +35 x 4 (total 235 x 4)
+    inputs = iter(["200", "foobar", "35 4"])
+
+    def fake_input(prompt: str = "") -> str:
+        return next(inputs)
+
+    monkeypatch.setattr(builtins, "input", fake_input)
+
+    one_rm, bw = cli.prompt_weighted_pullup_interactive()
+    out = capsys.readouterr().out
+
+    # 200 + 35 = 235, 235 x 4
+    # Epley: 235 * (1 + 4/30) = 235 * 34/30 ≈ 266.33 -> 266
+    assert bw == 200
+    assert one_rm == 266
+
+    # Should have complained once about invalid WPU input
+    assert "Could not parse weighted pull-up input" in out
