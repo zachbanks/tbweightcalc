@@ -1,4 +1,4 @@
-from .exercise_set import ExerciseSet
+from .exercise_set import ExerciseSet, optimize_warmup_weight
 from .program import apply_markdown
 
 
@@ -107,7 +107,7 @@ class ExerciseCluster:
                 self.exercise == ExerciseCluster.SQUAT
                 or self.exercise == ExerciseCluster.BENCHPRESS
             ):
-                # Squat values
+                # Squat/bench warm-up values
                 setreps = [
                     {"set": 2, "reps": 5, "multiplier": 0},
                     {"set": 1, "reps": 5, "multiplier": 0.4},
@@ -221,7 +221,7 @@ class ExerciseCluster:
                 s.bar = False
 
             # Deal with set and rep ranges
-            if "range" in dict and dict["range"] == True:
+            if "range" in dict and dict["range"] is True:
                 if "min_set" in dict:
                     s.min_set = dict["min_set"]
                 if "max_set" in dict:
@@ -237,8 +237,23 @@ class ExerciseCluster:
             else:
                 s.set = dict["set"]
                 s.reps = dict["reps"]
-            if not self.exercise == ExerciseCluster.WPU:
+
+            # Normal barbell lifts (squat/bench/deadlift)
+            if self.exercise != ExerciseCluster.WPU:
+                # Calculate base lifting weight
                 s.calc_lifting_weight(self.working_weight, dict["multiplier"])
+
+                # For warm-up sets ONLY (multiplier < 1.0) on barbell lifts,
+                # try to optimize to the next plate if within 2.5 lb.
+                if dict.get("multiplier", 1.0) < 1.0:
+                    s.weight = optimize_warmup_weight(
+                        total_weight=s.weight,
+                        bar_weight=45.0,  # standard bar
+                        # use default plate set from optimize_warmup_weight
+                        threshold=2.5,
+                    )
+
+            # Weighted pull-ups
             else:
                 s.calc_weighted_pullup(
                     self.working_weight, self.body_weight, dict["multiplier"]

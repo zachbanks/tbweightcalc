@@ -175,9 +175,192 @@ class TestExerciseSet(unittest.TestCase):
             self.assertNotIn("(45 x 2)", out)
 
 
-#############
-# RUN TESTS #
-#############
+import tbweightcalc.exercise_set as es
 
-if __name__ == "__main__":
-    unittest.main()
+
+class TestOptimizeWarmupWeight:
+    def test_does_nothing_for_bar_only_or_lighter(self):
+        assert es.optimize_warmup_weight(45) == 45
+        assert es.optimize_warmup_weight(40) == 40
+
+    def test_rounds_up_within_threshold_to_next_plate(self):
+        # total = 90 lb (45 bar + 22.5/side)
+        # per-side = 22.5, next plate = 25
+        # 25 - 22.5 = 2.5 <= threshold -> bump to 95 total
+        result = es.optimize_warmup_weight(90)
+        assert result == 95
+
+    def test_does_not_round_if_gap_is_too_large(self):
+        # total = 100 lb -> per-side = 27.5
+        # next plate = 35 -> gap = 7.5 > 2.5 -> no change
+        result = es.optimize_warmup_weight(100)
+        assert result == 100
+
+    def test_respects_custom_threshold(self):
+        # total = 90 lb -> per-side = 22.5
+        # next plate = 25 -> gap = 2.5
+        # with threshold = 2.0, should NOT bump
+        result = es.optimize_warmup_weight(90, threshold=2.0)
+        assert result == 90
+
+    def test_uses_custom_available_plates(self):
+        # available plates only 45 and 10
+        # total = 65 lb -> per-side = 10
+        # exact match to 10 plate -> stays 65
+        result = es.optimize_warmup_weight(
+            65,
+            bar_weight=45,
+            available_plates=[45, 10],
+        )
+        assert result == 65
+
+        # total = 60 lb -> per-side = 7.5
+        # next plate = 10, gap = 2.5 -> bump to 65
+        result2 = es.optimize_warmup_weight(
+            60,
+            bar_weight=45,
+            available_plates=[45, 10],
+        )
+        assert result2 == 65
+
+
+import tbweightcalc.exercise_set as es
+
+
+class TestOptimizeWarmupWeight:
+    def test_does_nothing_for_bar_only_or_lighter(self):
+        assert es.optimize_warmup_weight(45) == 45
+        assert es.optimize_warmup_weight(40) == 40
+
+    def test_rounds_small_warmup_to_next_plate_around_25(self):
+        # total = 90 lb (45 bar + 22.5/side)
+        # per-side = 22.5
+        # base_plate = 15, remainder = 7.5
+        # next plate >= 7.5 is 10, gap = 2.5 -> per-side 25, total 95
+        result = es.optimize_warmup_weight(90)
+        assert result == 95
+
+    def test_rounds_45_15_5_2_5_to_45_25(self):
+        """
+        180 total = 45 bar + (45+15+5+2.5) per side
+
+        per-side = 67.5
+        base_plate = 45
+        remainder = 22.5
+        next plate >= 22.5 is 25 (gap = 2.5)
+
+        -> per-side = 45 + 25 = 70
+        -> total = 45 + 2*70 = 185
+        """
+        result = es.optimize_warmup_weight(180)
+        assert result == 185
+
+    def test_does_not_round_if_gap_is_too_large(self):
+        # total = 100 lb -> per-side = 27.5
+        # base_plate = 25, remainder = 2.5
+        # next plate >= 2.5 is 2.5 (exact match) -> stays 100
+        result = es.optimize_warmup_weight(100)
+        assert result == 100
+
+        # With a tighter threshold, 90 should also stay 90
+        result2 = es.optimize_warmup_weight(90, threshold=2.0)
+        assert result2 == 90
+
+    def test_respects_custom_available_plates(self):
+        # Only 10-lb small plates available (plus bar)
+        # total = 60 -> per-side = 7.5
+        # base_plate = 0, remainder = 7.5
+        # next plate >= 7.5 is 10, gap = 2.5 -> total becomes 65
+        result = es.optimize_warmup_weight(
+            60,
+            bar_weight=45,
+            available_plates=[45, 10],
+        )
+        assert result == 65
+
+
+import tbweightcalc.exercise_set as es
+
+
+class TestOptimizeWarmupWeight:
+    def test_does_nothing_for_bar_only_or_lighter(self):
+        assert es.optimize_warmup_weight(45) == 45
+        assert es.optimize_warmup_weight(40) == 40
+
+    def test_rounds_small_warmup_to_next_plate_around_25(self):
+        # 90 total -> per-side = (90 - 45)/2 = 22.5
+        # base_total = 0, remainder = 22.5
+        # next plate >= 22.5 is 25 (gap 2.5) -> total 95
+        result = es.optimize_warmup_weight(90)
+        assert result == 95
+
+    def test_rounds_single_45_with_small_plates_to_45_and_25(self):
+        """
+        180 total = 45 bar + (45+15+5+2.5) per side
+
+        per-side     = 67.5
+        base_total   = 45 (one 45 peeled off)
+        remainder    = 22.5
+        next plate   = 25 (gap = 2.5)
+
+        -> per-side  = 45 + 25 = 70
+        -> total     = 45 + 2*70 = 185
+        """
+        result = es.optimize_warmup_weight(180)
+        assert result == 185
+
+    def test_rounds_double_45_with_small_plates_to_45x2_and_35(self):
+        """
+        290 total = 45 bar + (45+45+25+5+2.5) per side
+
+        per-side     = (290 - 45)/2 = 122.5
+        peel 45s     = base_total = 90, remainder = 32.5
+        next plate   = 35 (gap = 2.5)
+
+        -> per-side  = 90 + 35 = 125
+        -> total     = 45 + 2*125 = 295
+        """
+        result = es.optimize_warmup_weight(290)
+        assert result == 295
+
+    def test_does_not_round_if_gap_is_too_large(self):
+        # total = 100 -> per-side = 27.5
+        # base_total = 0, remainder = 27.5
+        # next plate = 35 (gap = 7.5 > 2.5) -> stays 100
+        result = es.optimize_warmup_weight(100)
+        assert result == 100
+
+    def test_respects_custom_available_plates(self):
+        # Only 10-lb plates (plus bar)
+        # 60 total -> per-side = 7.5
+        # base_total = 0, remainder = 7.5
+        # next plate = 10 (gap 2.5) -> total 65
+        result = es.optimize_warmup_weight(
+            60,
+            bar_weight=45,
+            available_plates=[45, 10],
+        )
+        assert result == 65
+
+    def test_optimize_with_custom_plates_55_45_25_10_5(self):
+        # Example: bar 45 + per side (45 + 10 + 5) = 65 per side => 175 total
+        # Let’s say this is a warm-up and we want to see if 10+5 (15) bumps to 25.
+        #
+        # per-side = (175 - 45)/2 = 65
+        # largest = 55 -> per-side-55 = 10 < 55 so base_total = 55, remainder = 10
+        # next plate >= 10 is 10 (gap = 0) so no change: stays 175.
+        #
+        # Now try 45 + 15 per side: 45 + 15 = 60 per side => 165 total
+        # per-side = 60, base_total = 55, remainder = 5
+        # next plate >= 5 is 5 (gap = 0) -> stays 165.
+        #
+        # But for something like (45 + 10 + 10) = 65 per side => 175 total:
+        # remainder = 10, and 25 is > 10 with gap 15 -> > threshold, no bump.
+        #
+        # This test mainly ensures function doesn't blow up and respects the plate set.
+        result = es.optimize_warmup_weight(
+            165,
+            bar_weight=45,
+            available_plates=[55, 45, 25, 10, 5],
+        )
+        assert result == 165
