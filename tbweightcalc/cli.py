@@ -1,110 +1,23 @@
+from __future__ import annotations
+
 import argparse
 import datetime
-import tbweightcalc as tb
-from tbweightcalc.program import apply_markdown, markdown_to_pdf
-from tbweightcalc.onerm import calculate_one_rm
 import os
 import re
 import shutil
 import subprocess
-from pathlib import Path
 import sys
-import re
+from pathlib import Path
+from typing import Optional
+
+import tbweightcalc as tb
+from tbweightcalc.onerm import calculate_one_rm
+from tbweightcalc.program import apply_markdown, markdown_to_pdf
 
 
 # -------------------------------------------------------------------
 # Helpers
 # -------------------------------------------------------------------
-
-
-def parse_one_rm_string(raw: str) -> int | None:
-    """
-    Parse a 1RM-related input string.
-
-    Accepted formats:
-      - '' or whitespace        -> returns None
-      - '455'                   -> returns 455 (known 1RM)
-      - '240 5'                 -> weight 240 x 5 reps, returns estimated 1RM
-      - '240x5' or '240X5'      -> same as above
-
-
-    Returns:
-      - int 1RM on success
-      - None on unparseable input
-    """
-    raw = raw.strip()
-    if not raw:
-        return None
-
-    # Case 1: single integer -> known 1RM
-    if raw.isdigit():
-        return int(raw)
-
-    # Case 2: 'weightxreps' or 'weightXreps'
-    m = re.match(r"^(\d+)[xX](\d+)$", raw)
-    if m:
-        weight = int(m.group(1))
-        reps = int(m.group(2))
-        return calculate_one_rm(weight, reps)
-
-    # Case 3: 'weight reps'
-    parts = raw.split()
-    if len(parts) == 2 and all(p.isdigit() for p in parts):
-        weight = int(parts[0])
-        reps = int(parts[1])
-        return calculate_one_rm(weight, reps)
-
-    # Anything else: unparseable
-    return None
-
-
-def parse_weighted_pullup_string(bodyweight: int, raw: str) -> int | None:
-    """
-    Parse weighted pull-up input including:
-        - '35x4', '35 4', '35X4'
-        - 'bwx4', 'bw x 4', 'bw 4'
-        - 'bw' (1 rep)
-        - uppercase or mixed-case variants
-    """
-    raw = raw.strip()
-    if not raw:
-        return None
-
-    lower = raw.lower()
-
-    # --- BW only, no reps -> default to 1 rep ---
-    if lower == "bw":
-        added = 0
-        reps = 1
-
-    # --- BW x reps (with explicit x) ---
-    elif re.match(r"^bw\s*[xX]\s*(\d+)$", lower):
-        reps = int(re.findall(r"\d+", lower)[0])
-        added = 0
-
-    # --- BW reps (without x): e.g. 'bw 4' ---
-    elif re.match(r"^bw\s+(\d+)$", lower):
-        reps = int(re.findall(r"\d+", lower)[0])
-        added = 0
-
-    else:
-        # --- Numeric '35x4' ---
-        m = re.match(r"^(\d+)[xX](\d+)$", raw)
-        if m:
-            added = int(m.group(1))
-            reps = int(m.group(2))
-
-        else:
-            # --- Numeric '35 4' ---
-            parts = raw.split()
-            if len(parts) == 2 and all(p.isdigit() for p in parts):
-                added = int(parts[0])
-                reps = int(parts[1])
-            else:
-                return None
-
-    total = bodyweight + added
-    return calculate_one_rm(total, reps)
 
 
 def copy_to_clipboard(text: str) -> None:
@@ -129,7 +42,7 @@ def copy_to_clipboard(text: str) -> None:
         pass
 
 
-def default_pdf_path(title: str | None) -> Path:
+def default_pdf_path(title: Optional[str]) -> Path:
     """
     Default PDF location: ~/Downloads/<title>.pdf
 
@@ -244,6 +157,145 @@ def build_program_markdown(args: argparse.Namespace, for_pdf: bool = False) -> s
     return "\n".join(lines).rstrip()
 
 
+# -------------------------------------------------------------------
+# 1RM parsing helpers
+# -------------------------------------------------------------------
+
+
+def parse_one_rm_string(raw: str) -> int | None:
+    """
+    Parse generic 1RM input string.
+
+    Accepts:
+      - '' or whitespace -> None
+      - '455'            -> 455 (assumed true 1RM)
+      - '240 5'          -> estimate 1RM from 240 x 5
+      - '240x5', '240X5' -> same as above
+    """
+    raw = raw.strip()
+    if not raw:
+        return None
+
+    # '240x5' or '240X5'
+    m = re.match(r"^(\d+)[xX](\d+)$", raw)
+    if m:
+        weight = float(m.group(1))
+        reps = int(m.group(2))
+        return calculate_one_rm(weight, reps)
+
+    parts = raw.split()
+
+    # '240 5'
+    if len(parts) == 2 and all(p.isdigit() for p in parts):
+        weight = float(parts[0])
+        reps = int(parts[1])
+        return calculate_one_rm(weight, reps)
+
+    # Single integer '455' -> literal 1RM
+    if len(parts) == 1 and parts[0].isdigit():
+        return int(parts[0])
+
+    return None
+
+
+def parse_weighted_pullup_string(bodyweight: int, raw: str) -> int | None:
+    """
+    Parse weighted pull-up input given a bodyweight.
+
+    bodyweight: integer body weight in lb.
+
+    raw: one of:
+      - '' or whitespace                -> returns None
+      - '35 4'                          -> +35 lb for 4 reps
+      - '35x4' or '35X4'                -> +35 lb for 4 reps
+      - '0 4'                           -> bodyweight-only for 4 reps
+      - 'bw'                            -> bodyweight-only for 1 rep
+      - 'bwx4', 'bw x 4', 'bw 4'        -> bodyweight-only for 4 reps
+      - '45'                            -> +45 lb for 1 rep
+
+    Returns:
+      - total 1RM (bodyweight + added) as an int
+      - None if input is blank or invalid
+    """
+    raw = raw.strip()
+    if not raw:
+        return None
+
+    lower = raw.lower()
+
+    added: int
+    reps: int
+
+    # --- BW-only shorthands ---
+    if lower == "bw":
+        added = 0
+        reps = 1
+    else:
+        # "bwx4", "bw x 4", "bw 4"
+        m_bw = re.match(r"^bw\s*[xX]?\s*(\d+)$", lower)
+        if m_bw:
+            added = 0
+            reps = int(m_bw.group(1))
+        else:
+            # --- Numeric styles ---
+
+            # '35x4' or '35X4'
+            m = re.match(r"^(\d+)[xX](\d+)$", raw)
+            if m:
+                added = int(m.group(1))
+                reps = int(m.group(2))
+            else:
+                parts = raw.split()
+
+                # '35 4' style
+                if len(parts) == 2 and all(p.isdigit() for p in parts):
+                    added = int(parts[0])
+                    reps = int(parts[1])
+
+                # Single number '45' -> +45 lb for 1 rep
+                elif len(parts) == 1 and parts[0].isdigit():
+                    added = int(parts[0])
+                    reps = 1
+                else:
+                    return None
+
+    total_weight = bodyweight + added
+    return calculate_one_rm(total_weight, reps)
+
+
+# -------------------------------------------------------------------
+# Interactive helpers
+# -------------------------------------------------------------------
+
+
+def prompt_lift_one_rm(label: str) -> int | None:
+    """
+    Prompt for a lift 1RM or set using parse_one_rm_string.
+
+    Loops until:
+      - user enters a valid 1RM/set string -> returns int
+      - user enters blank                  -> returns None
+    """
+    while True:
+        raw = input(
+            f"{label} 1RM or set (e.g. '455' or '240 5' or '240x5', blank to skip): "
+        )
+        stripped = raw.strip()
+
+        # User decided to skip this lift
+        if not stripped:
+            return None
+
+        value = parse_one_rm_string(stripped)
+        if value is not None:
+            return value
+
+        print(
+            f"Could not parse input for {label!r}. "
+            "Please try again, or leave blank to skip."
+        )
+
+
 def prompt_weighted_pullup_interactive() -> tuple[int | None, int | None]:
     """
     Interactive prompt for weighted pull-ups.
@@ -286,6 +338,7 @@ def prompt_weighted_pullup_interactive() -> tuple[int | None, int | None]:
             "Weighted pull-up set (additional weight and reps). Examples:\n"
             "  '35 4'   -> +35 lb for 4 reps\n"
             "  '35x4'   -> +35 lb for 4 reps\n"
+            "  '45'     -> +45 lb for 1 rep\n"
             "  '0 4'    -> bodyweight-only for 4 reps\n"
             "  'bw 4'   -> bodyweight-only for 4 reps\n"
             "  'bwx4'   -> bodyweight-only for 4 reps\n"
@@ -307,32 +360,30 @@ def prompt_weighted_pullup_interactive() -> tuple[int | None, int | None]:
         )
 
 
-def prompt_lift_one_rm(label: str) -> int | None:
+def prompt_one_rm() -> None:
     """
-    Prompt for a lift 1RM or set using parse_one_rm_string.
+    Simple interactive 1RM prompt:
 
-    Loops until:
-      - user enters a valid 1RM/set string -> returns int
-      - user enters blank                  -> returns None
+    - Asks for weight (lbs)
+    - Asks for reps
+    - Prints estimated 1RM (rounded to nearest lb)
+    - Copies *number only* to clipboard
     """
-    while True:
-        raw = input(
-            f"{label} 1RM or set (e.g. '455' or '240 5' or '240x5', blank to skip): "
-        )
-        stripped = raw.strip()
+    print("=== 1RM Estimator (Epley) ===")
+    try:
+        raw_weight = input("Enter weight lifted (in pounds): ").strip()
+        raw_reps = input("Enter number of reps: ").strip()
 
-        # User decided to skip this lift
-        if not stripped:
-            return None
+        weight = float(raw_weight)
+        reps = int(raw_reps)
 
-        value = parse_one_rm_string(stripped)
-        if value is not None:
-            return value
-
-        print(
-            f"Could not parse input for {label!r}. "
-            "Please try again, or leave blank to skip."
-        )
+        est = calculate_one_rm(weight, reps)
+        print(f"\nEstimated 1RM: {est} lb")
+        copy_to_clipboard(str(est))
+    except ValueError as e:
+        print(f"\nInvalid input: {e}")
+    except KeyboardInterrupt:
+        print("\n[Aborted by user]")
 
 
 def run_interactive() -> None:
@@ -436,18 +487,13 @@ def main() -> None:
         nargs=2,
     )
 
-    # -------------- 1RM FLAG --------------
     parser.add_argument(
         "-1rm",
         "--onerepmax",
-        nargs="*",
+        help="Estimate 1RM: with args 'weight reps' or interactively with no args",
         type=int,
-        dest="onerepmax",
-        metavar=("WEIGHT", "REPS"),
-        help=(
-            "Estimate 1RM. Usage: --onerepmax 300 5 OR just --onerepmax "
-            "to enter interactive 1RM mode."
-        ),
+        nargs="*",
+        dest="onerm",
     )
 
     parser.add_argument(
@@ -460,6 +506,7 @@ def main() -> None:
         help="Optional explicit path for the PDF output; defaults to ~/Downloads/<title>.pdf",
     )
 
+    # No arguments at all -> full interactive program mode
     if len(sys.argv) == 1:
         try:
             run_interactive()
@@ -470,30 +517,23 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    # ----------- 1RM MODE (FLAG GIVEN) -----------
-    if args.onerepmax is not None:
-        # Case 1: Flag given but NO numbers → interactive 1RM
-        if len(args.onerepmax) == 0:
+    # If 1RM calculator flag is used, handle it first and exit
+    if args.onerm is not None:
+        if len(args.onerm) == 0:
+            # No args -> interactive 1RM calculator
             prompt_one_rm()
             return
-
-        # Case 2: Flag given with EXACTLY 2 args → compute 1RM
-        if len(args.onerepmax) == 2:
-            weight, reps = args.onerepmax
-
+        elif len(args.onerm) == 2:
+            weight, reps = args.onerm
             est = calculate_one_rm(weight, reps)
-            print(f"Estimated 1RM for {weight} x {reps}: {est} lb")
-
-            # Copy numeric 1RM to clipboard
+            print(f"Estimated 1RM: {est} lb")
             copy_to_clipboard(str(est))
-            print("[Copied 1RM to clipboard]")
-
             return
-
-        # Case 3: Incorrect usage (wrong number of args)
-        parser.error(
-            "-1rm/--onerepmax expects either NOTHING or exactly TWO arguments: WEIGHT REPS"
-        )
+        else:
+            print(
+                "Error: --onerepmax expects either no arguments or exactly two (weight reps)."
+            )
+            return
 
     # Decide title
     if args.title:
@@ -529,34 +569,6 @@ def main() -> None:
 
     # Echo where the PDF went
     print(f"\n[PDF saved to: {pdf_path}]")
-
-
-def prompt_one_rm() -> None:
-    """
-    Simple interactive 1RM prompt:
-
-    - Asks for weight (lbs)
-    - Asks for reps
-    - Prints estimated 1RM (rounded to nearest lb)
-    - Copies the numeric 1RM to the clipboard
-    """
-    print("=== 1RM Estimator (Epley) ===")
-    try:
-        raw_weight = input("Enter weight lifted (in pounds): ").strip()
-        raw_reps = input("Enter number of reps: ").strip()
-
-        weight = float(raw_weight)
-        reps = int(raw_reps)
-
-        est = calculate_one_rm(weight, reps)
-        print(f"\nEstimated 1RM: {est} lb")
-
-        # Copy number only 1RM to clipboard
-        copy_to_clipboard(str(est))
-    except ValueError as e:
-        print(f"\nInvalid input: {e}")
-    except KeyboardInterrupt:
-        print("\n[Aborted by user]")
 
 
 if __name__ == "__main__":
