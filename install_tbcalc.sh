@@ -2,17 +2,17 @@
 set -euo pipefail
 
 # ============================================================
-# tbcalc install script
+# tbcalc install script (lightweight LaTeX version)
 # ============================================================
 # - Detects macOS or Ubuntu/Debian Linux
 # - Installs system dependencies:
-#       pandoc, LaTeX engine (XeLaTeX), JetBrainsMono Nerd Font
+#       pandoc, XeLaTeX (minimal), JetBrainsMono Nerd Font
 # - Installs pipx (if missing)
 # - Installs tbcalc globally so `tbcalc` works anywhere
 # ============================================================
 
-GITHUB_REPO="zachbanks/tbweightcalc"   # ← YOUR repo path
-PACKAGE_NAME="tbweightcalc"            # must match pyproject.toml name
+GITHUB_REPO="zachbanks/tbweightcalc"   # ← your GitHub repo
+PACKAGE_NAME="tbweightcalc"            # must match [project.name] in pyproject.toml
 
 echo "==> Detecting operating system..."
 OS="$(uname -s)"
@@ -32,15 +32,12 @@ case "$OS" in
     ;;
 esac
 
-# ------------------------------------------------------------
-# Helper: command_exists
-# ------------------------------------------------------------
 command_exists() {
   command -v "$1" >/dev/null 2>&1
 }
 
 # ------------------------------------------------------------
-# macOS: install Homebrew if missing
+# macOS: ensure Homebrew
 # ------------------------------------------------------------
 if [ "$PLATFORM" = "macos" ]; then
   if ! command_exists brew; then
@@ -59,8 +56,19 @@ if [ "$PLATFORM" = "macos" ]; then
   echo "==> Installing pandoc..."
   brew install pandoc || true
 
-  echo "==> Installing MacTeX (XeLaTeX)..."
-  brew install --cask mactex || true
+  echo "==> Installing BasicTeX (minimal LaTeX with XeLaTeX)..."
+  brew install --cask basictex || true
+
+  echo "==> Ensuring TeX bin directory is on PATH..."
+  TEXBIN="/Library/TeX/texbin"
+  if ! echo "$PATH" | grep -q "$TEXBIN"; then
+    echo "export PATH=\"$TEXBIN:\$PATH\"" >> "${HOME}/.zshrc"
+    export PATH="$TEXBIN:$PATH"
+  fi
+
+  echo "==> Updating tlmgr and installing required LaTeX packages..."
+  sudo tlmgr update --self || true
+  sudo tlmgr install fancyhdr titling || true
 
   echo "==> Installing JetBrainsMono Nerd Font..."
   brew tap homebrew/cask-fonts || true
@@ -71,7 +79,9 @@ else
   if ! command_exists apt && ! command_exists apt-get; then
     echo "❌ ERROR: Non-apt Linux detected."
     echo "Install manually:"
-    echo "  sudo apt install pandoc texlive-full"
+    echo "  sudo apt install pandoc texlive-xetex texlive-latex-recommended texlive-latex-extra"
+    echo "  (optional) install JetBrainsMono Nerd Font"
+    echo "Then:"
     echo "  pipx install \"git+https://github.com/${GITHUB_REPO}.git\""
     exit 1
   fi
@@ -79,10 +89,10 @@ else
   echo "==> Updating apt package lists..."
   sudo apt update -y
 
-  echo "==> Installing pandoc + LaTeX (this is large)..."
-  sudo apt install -y pandoc texlive-full
+  echo "==> Installing pandoc + minimal LaTeX with XeLaTeX..."
+  sudo apt install -y pandoc texlive-xetex texlive-latex-recommended texlive-latex-extra
 
-  echo "==> Installing JetBrainsMono Nerd Font..."
+  echo "==> Installing JetBrainsMono Nerd Font (user-local)..."
   FONT_DIR="${HOME}/.local/share/fonts"
   mkdir -p "$FONT_DIR"
   TMP_DIR="$(mktemp -d)"
@@ -105,8 +115,13 @@ if ! command_exists pipx; then
     brew install pipx
     pipx ensurepath || true
   else
-    python3 -m pip install --user pipx
-    python3 -m pipx ensurepath || true
+    if command_exists python3; then
+      python3 -m pip install --user pipx
+      python3 -m pipx ensurepath || true
+    else
+      echo "❌ ERROR: python3 not found. Please install Python 3.10+ first."
+      exit 1
+    fi
   fi
 else
   echo "==> ✔ pipx already installed."

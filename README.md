@@ -68,3 +68,9 @@ sudo tlmgr install fancyhdr titling
 brew install --cask font-jetbrains-mono-nerd-font
 
 pipx install tbweightcalc
+```
+
+## Install script
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/zachbanks/tbweightcalc/main/install_tbcalc.sh)"
+```
