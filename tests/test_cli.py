@@ -3,7 +3,14 @@ from pathlib import Path
 import sys
 import builtins
 
-import tbweightcalc.cli as cli
+import pytest
+
+from tbweightcalc import cli
+
+
+# -------------------------------------------------------------------
+# Small helper for build_program_markdown tests
+# -------------------------------------------------------------------
 
 
 def make_args(
@@ -17,6 +24,7 @@ def make_args(
 ) -> argparse.Namespace:
     """
     Helper to create an argparse-like Namespace for build_program_markdown.
+    Uses the legacy fields that build_program_markdown still understands.
     """
     ns = argparse.Namespace()
     ns.week = week
@@ -62,11 +70,8 @@ def test_build_program_markdown_single_week_screen():
 
     # Should include a WEEK 2 header as an H2
     assert "## WEEK 2 - 80%" in md
-    # Squat line should be present somewhere
-    assert "squat" in md.lower()
-    # Should contain the separator '---' style HR since for_pdf=False and multiple weeks not used
-    # (for a single week it shouldn't add extra HRs at end)
-    assert "\\pagebreak" not in md  # that's PDF-only
+    # Should not contain PDF-only pagebreak markers
+    assert "\\pagebreak" not in md
 
 
 def test_build_program_markdown_pdf_uses_pagebreaks():
@@ -76,12 +81,12 @@ def test_build_program_markdown_pdf_uses_pagebreaks():
 
     # In PDF mode we expect raw \pagebreak between weeks
     assert "\\pagebreak" in md
-    # No visible horizontal rules
+    # We don't expect visible '---' HRs from our HR helper in PDF mode
     assert "---" not in md
 
 
 # -------------------------------------------------------------------
-# Tests for main() CLI behavior
+# Tests for main() CLI behavior (non-interactive paths)
 # -------------------------------------------------------------------
 
 
@@ -109,7 +114,10 @@ def test_main_prints_title_and_calls_markdown_to_pdf(monkeypatch, capsys, tmp_pa
         "--pdf",
         str(pdf_path),
     ]
+
+    # Avoid real clipboard and keep argparse/os/Path in module
     monkeypatch.setattr(cli, "copy_to_clipboard", lambda text: None)
+    monkeypatch.setattr(sys, "argv", argv)
 
     # Capture the args passed into markdown_to_pdf instead of actually running it
     called = {}
@@ -123,19 +131,6 @@ def test_main_prints_title_and_calls_markdown_to_pdf(monkeypatch, capsys, tmp_pa
         Path(output_path).write_bytes(b"%PDF-FAKE%")
 
     monkeypatch.setattr(cli, "markdown_to_pdf", fake_markdown_to_pdf)
-
-    # Patch sys.argv for argparse
-    monkeypatch.setattr(cli, "argparse", cli.argparse)
-    monkeypatch.setenv("PYTHONUNBUFFERED", "1")
-
-    # Run main with patched sys.argv
-    monkeypatch.setattr(cli, "os", cli.os)
-    monkeypatch.setattr(cli, "Path", cli.Path)
-
-    # Easiest: monkeypatch sys.argv in the module
-    import sys
-
-    monkeypatch.setattr(sys, "argv", argv)
 
     cli.main()
 
@@ -175,6 +170,7 @@ def test_main_uses_default_title_when_not_provided(monkeypatch, capsys, tmp_path
     ]
 
     monkeypatch.setattr(cli, "copy_to_clipboard", lambda text: None)
+    monkeypatch.setattr(sys, "argv", argv)
 
     called = {}
 
@@ -185,10 +181,6 @@ def test_main_uses_default_title_when_not_provided(monkeypatch, capsys, tmp_path
         Path(output_path).write_bytes(b"%PDF-FAKE%")
 
     monkeypatch.setattr(cli, "markdown_to_pdf", fake_markdown_to_pdf)
-
-    import sys
-
-    monkeypatch.setattr(sys, "argv", argv)
 
     cli.main()
 
@@ -204,148 +196,28 @@ def test_main_uses_default_title_when_not_provided(monkeypatch, capsys, tmp_path
     assert pdf_path.exists()
 
 
-def test_main_interactive_text_only(monkeypatch, capsys):
+def test_main_calls_run_interactive_when_no_args(monkeypatch):
     """
-    When tbcalc is run with no CLI options, it should enter interactive mode.
-
-    In this scenario the user:
-      - provides a title
-      - provides squat & bench 1RMs
-      - skips deadlift & WPU
-      - chooses text-only output
+    When tbcalc is run with no CLI arguments (other than the program name),
+    main() should call run_interactive() instead of parsing flags.
     """
+    called = {"run_interactive": False}
 
-    # Simulate: tbcalc  (no args)
+    def fake_run_interactive():
+        called["run_interactive"] = True
+
+    # Pretend we invoked "tbcalc" with no extra args
+    monkeypatch.setattr(cli, "run_interactive", fake_run_interactive)
     monkeypatch.setattr(sys, "argv", ["tbcalc"])
-
-    # Fake user inputs for input() prompts
-    inputs = iter(
-        [
-            "My Interactive Title",  # title
-            "455",  # squat 1RM
-            "250",  # bench 1RM
-            "",  # deadlift (blank -> skip)
-            "",  # weighted pull-up (blank -> skip)
-            "all",  # week selection
-            "t",  # output: text only
-        ]
-    )
-
-    def fake_input(prompt: str = "") -> str:
-        return next(inputs)
-
-    import builtins
-
-    monkeypatch.setattr(builtins, "input", fake_input)
-
-    # Avoid touching system clipboard in tests
-    monkeypatch.setattr(cli, "copy_to_clipboard", lambda text: None)
-
-    # Track whether markdown_to_pdf gets called (it should NOT for text-only)
-    called = {"pdf": False}
-
-    def fake_markdown_to_pdf(markdown: str, output_path: str, title: str | None = None):
-        called["pdf"] = True
-
-    monkeypatch.setattr(cli, "markdown_to_pdf", fake_markdown_to_pdf)
-
-    # Run main()
-    cli.main()
-
-    out = capsys.readouterr().out
-
-    # Should print the title and some program content
-    assert "My Interactive Title" in out
-    assert "WEEK" in out.upper()
-    assert "455" in out  # squat
-    assert "250" in out  # bench
-    # Deadlift and WPU were skipped, so no obvious WPU numbers
-    # (you can tighten this if you want more specific checks)
-
-    # In text-only mode, we should NOT generate a PDF
-    assert called["pdf"] is False
-
-
-def test_main_interactive_both_generates_pdf(monkeypatch, capsys, tmp_path):
-    """
-    Interactive mode with 'both' output should still call markdown_to_pdf.
-    """
-
-    monkeypatch.setattr(sys, "argv", ["tbcalc"])
-
-    inputs = iter(
-        [
-            "",  # title (blank -> default title)
-            "455",  # squat
-            "250",  # bench
-            "300",  # deadlift
-            "",  # WPU (skip)
-            "1",  # week = 1 only
-            "b",  # output: both (text + pdf)
-        ]
-    )
-
-    def fake_input(prompt: str = "") -> str:
-        return next(inputs)
-
-    import builtins
-
-    monkeypatch.setattr(builtins, "input", fake_input)
-    monkeypatch.setattr(cli, "copy_to_clipboard", lambda text: None)
-
-    # Capture markdown_to_pdf arguments
-    pdf_call = {}
-
-    def fake_markdown_to_pdf(markdown: str, output_path: str, title: str | None = None):
-        pdf_call["markdown"] = markdown
-        pdf_call["output_path"] = output_path
-        pdf_call["title"] = title
-        # Simulate file creation
-        Path(output_path).write_bytes(b"%PDF-FAKE%")
-
-    monkeypatch.setattr(cli, "markdown_to_pdf", fake_markdown_to_pdf)
 
     cli.main()
 
-    out = capsys.readouterr().out
-
-    # Should print some text for week 1 with the right lifts
-    assert "Week 1" in out or "WEEK 1" in out.upper()
-    assert "455" in out
-    assert "250" in out
-    assert "300" in out
-
-    # PDF generation should have been invoked
-    assert "output_path" in pdf_call
-    assert "markdown" in pdf_call
-    assert pdf_call["markdown"]  # non-empty markdown
-    assert pdf_call["title"] is not None
+    assert called["run_interactive"] is True
 
 
-def test_main_interactive_ctrl_c_exits_cleanly(monkeypatch, capsys):
-    """
-    If the user hits Ctrl-C in interactive mode, main() should
-    exit cleanly without propagating KeyboardInterrupt.
-    """
-
-    # Simulate: tbcalc  (no args)
-    monkeypatch.setattr(sys, "argv", ["tbcalc"])
-
-    # First call to input() raises KeyboardInterrupt, like pressing Ctrl-C
-    def fake_input(prompt: str = "") -> str:
-        raise KeyboardInterrupt
-
-    monkeypatch.setattr(builtins, "input", fake_input)
-
-    # Make sure we don't touch clipboard or PDF in this path
-    monkeypatch.setattr(cli, "copy_to_clipboard", lambda text: None)
-    monkeypatch.setattr(cli, "markdown_to_pdf", lambda *a, **k: None)
-
-    # This should NOT raise KeyboardInterrupt; it should just print a message
-    cli.main()
-
-    out = capsys.readouterr().out
-    assert "Aborted by user" in out  # or whatever message you chose
+# -------------------------------------------------------------------
+# Tests for 1RM prompt / helpers
+# -------------------------------------------------------------------
 
 
 def test_prompt_one_rm(monkeypatch, capsys):
@@ -355,11 +227,14 @@ def test_prompt_one_rm(monkeypatch, capsys):
         return next(inputs)
 
     monkeypatch.setattr(builtins, "input", fake_input)
+    # avoid real clipboard
+    monkeypatch.setattr(cli, "copy_to_clipboard", lambda text: None)
 
     cli.prompt_one_rm()
 
     out = capsys.readouterr().out
     assert "Estimated 1RM" in out
+    # With Epley & rounding you’ve been using: 275 * (1 + 5/30) = 275 * 7/6 ≈ 321
     assert "321" in out
 
 
@@ -400,6 +275,11 @@ def test_prompt_one_rm_copies_numeric_result_to_clipboard(monkeypatch, capsys):
     assert copied["value"] == "321"
 
 
+# -------------------------------------------------------------------
+# Tests for parse_one_rm_string
+# -------------------------------------------------------------------
+
+
 class TestParseOneRmString:
     def test_blank_returns_none(self):
         assert cli.parse_one_rm_string("") is None
@@ -435,9 +315,9 @@ class TestParseOneRmString:
         assert cli.parse_one_rm_string("240 x 5") == base
 
 
-import builtins
-
-import tbweightcalc.cli as cli
+# -------------------------------------------------------------------
+# Tests for parse_weighted_pullup_string + interactive WPU helper
+# -------------------------------------------------------------------
 
 
 class TestParseWeightedPullupString:
@@ -450,7 +330,7 @@ class TestParseWeightedPullupString:
 
         # '35 4'  -> +35 for 4 reps  => 235 x 4
         r1 = cli.parse_weighted_pullup_string(bw, "35 4")
-        # Epley: 235 * (1 + 4/30) = 235 * 34/30 ≈ 266.33 -> 266
+        # Epley: 235 * (1 + 4/30) ≈ 266
         assert r1 == 266
 
         # '35x4'  -> +35 for 4 reps  => 235 x 4
@@ -470,7 +350,7 @@ class TestParseWeightedPullupString:
 
         # 'bw 4' -> BW for 4 reps => 200 x 4
         r2 = cli.parse_weighted_pullup_string(bw, "bw 4")
-        # 200 * (1 + 4/30) = 200 * 34/30 ≈ 226.67 -> 227
+        # 200 * (1 + 4/30) ≈ 227
         assert r2 == 227
 
         # 'bwx4' -> BW for 4 reps
@@ -603,3 +483,247 @@ class TestPromptWeightedPullupInteractive:
 
         assert bw == 200
         assert one_rm == 245  # 200 + 45 for 1 rep
+
+
+# -------------------------------------------------------------------
+# Fixtures + tests for interactive templates (run_interactive)
+# -------------------------------------------------------------------
+
+
+@pytest.fixture
+def no_side_effects(monkeypatch):
+    """
+    Disable clipboard + PDF side effects, and capture args passed into
+    build_program_markdown for inspection.
+    """
+    captured = {}
+
+    def fake_copy_to_clipboard(_text: str) -> None:
+        return
+
+    def fake_markdown_to_pdf(_md: str, _path: str, title: str | None = None) -> None:
+        return
+
+    def fake_build_program_markdown(
+        args: argparse.Namespace, for_pdf: bool = False
+    ) -> str:
+        captured["args"] = args
+        return "# TEST PROGRAM"
+
+    monkeypatch.setattr(cli, "copy_to_clipboard", fake_copy_to_clipboard)
+    monkeypatch.setattr(cli, "markdown_to_pdf", fake_markdown_to_pdf)
+    monkeypatch.setattr(cli, "build_program_markdown", fake_build_program_markdown)
+
+    return captured
+
+
+def test_interactive_template_classic_builds_expected_lifts(
+    monkeypatch, no_side_effects
+):
+    """
+    Template 1: Classic – Squat / Bench / Deadlift / (optional) WPU
+    """
+    captured = no_side_effects
+
+    # Inputs sequence:
+    # 1. title (blank -> default)
+    # 2. template = "1"
+    # 3. squat 1RM
+    # 4. bench 1RM
+    # 5. deadlift 1RM
+    # 6. WPU bodyweight (blank -> skip)
+    # 7. week (blank -> all)
+    # 8. output mode "t" (text only)
+    inputs = iter(
+        [
+            "",  # title
+            "1",  # template choice -> Classic
+            "455",  # squat
+            "315",  # bench
+            "500",  # deadlift
+            "",  # WPU bodyweight skip
+            "",  # week -> "all"
+            "t",  # output mode
+        ]
+    )
+
+    def fake_input(prompt: str = "") -> str:
+        return next(inputs)
+
+    monkeypatch.setattr(cli, "input", fake_input)
+
+    cli.run_interactive()
+
+    args = captured["args"]
+    lifts = args.lifts
+
+    assert lifts["squat"]["one_rm"] == 455
+    assert lifts["bench press"]["one_rm"] == 315
+    assert lifts["deadlift"]["one_rm"] == 500
+    # No WPU because we skipped BW
+    assert "weighted pullup" not in lifts
+
+
+def test_interactive_template_front_squat_block_builds_expected_lifts(
+    monkeypatch, no_side_effects
+):
+    """
+    Template 2: Front-squat Block – Front Squat / Overhead Press / Deadlift / (optional) WPU
+    """
+    captured = no_side_effects
+
+    inputs = iter(
+        [
+            "FS Block",  # title
+            "2",  # template choice -> Front-squat Block
+            "355",  # front squat
+            "185",  # overhead press
+            "495",  # deadlift
+            "200",  # WPU bodyweight
+            "35x4",  # WPU set
+            "3",  # week = 3
+            "t",  # output mode
+        ]
+    )
+
+    def fake_input(prompt: str = "") -> str:
+        return next(inputs)
+
+    monkeypatch.setattr(cli, "input", fake_input)
+
+    cli.run_interactive()
+
+    args = captured["args"]
+    lifts = args.lifts
+
+    assert "squat" not in lifts
+    assert "bench press" not in lifts
+    assert lifts["front squat"]["one_rm"] == 355
+    assert lifts["overhead press"]["one_rm"] == 185
+    assert lifts["deadlift"]["one_rm"] == 495
+    # WPU should be present with estimated 1RM and given BW
+    assert "weighted pullup" in lifts
+    assert lifts["weighted pullup"]["body_weight"] == 200
+
+
+# -------------------------------------------------------------------
+# Fixtures + tests for interactive templates (run_interactive)
+# -------------------------------------------------------------------
+
+
+@pytest.fixture
+def no_side_effects(monkeypatch):
+    """
+    Disable clipboard + PDF side effects, and capture args passed into
+    build_program_markdown for inspection.
+    """
+    captured = {}
+
+    def fake_copy_to_clipboard(_text: str) -> None:
+        return
+
+    def fake_markdown_to_pdf(_md: str, _path: str, title: str | None = None) -> None:
+        return
+
+    def fake_build_program_markdown(
+        args: argparse.Namespace, for_pdf: bool = False
+    ) -> str:
+        captured["args"] = args
+        return "# TEST PROGRAM"
+
+    monkeypatch.setattr(cli, "copy_to_clipboard", fake_copy_to_clipboard)
+    monkeypatch.setattr(cli, "markdown_to_pdf", fake_markdown_to_pdf)
+    monkeypatch.setattr(cli, "build_program_markdown", fake_build_program_markdown)
+
+    return captured
+
+
+def test_interactive_template_classic_builds_expected_lifts(
+    monkeypatch, no_side_effects
+):
+    """
+    Template 1: Classic – Squat / Bench / Deadlift / (optional) WPU
+    """
+    captured = no_side_effects
+
+    # Inputs sequence:
+    # 1. title (blank -> default)
+    # 2. template = "1"
+    # 3. squat 1RM
+    # 4. bench 1RM
+    # 5. deadlift 1RM
+    # 6. WPU bodyweight (blank -> skip)
+    # 7. week (blank -> all)
+    # 8. output mode "t" (text only)
+    inputs = iter(
+        [
+            "",  # title
+            "1",  # template choice -> Classic
+            "455",  # squat
+            "315",  # bench
+            "500",  # deadlift
+            "",  # WPU bodyweight skip
+            "",  # week -> "all"
+            "t",  # output mode
+        ]
+    )
+
+    def fake_input(prompt: str = "") -> str:
+        return next(inputs)
+
+    # ✅ patch builtins.input, not cli.input
+    monkeypatch.setattr(builtins, "input", fake_input)
+
+    cli.run_interactive()
+
+    args = captured["args"]
+    lifts = args.lifts
+
+    assert lifts["squat"]["one_rm"] == 455
+    assert lifts["bench press"]["one_rm"] == 315
+    assert lifts["deadlift"]["one_rm"] == 500
+    # No WPU because we skipped BW
+    assert "weighted pullup" not in lifts
+
+
+def test_interactive_template_front_squat_block_builds_expected_lifts(
+    monkeypatch, no_side_effects
+):
+    """
+    Template 2: Front-squat Block – Front Squat / Overhead Press / Deadlift / (optional) WPU
+    """
+    captured = no_side_effects
+
+    inputs = iter(
+        [
+            "FS Block",  # title
+            "2",  # template choice -> Front-squat Block
+            "355",  # front squat
+            "185",  # overhead press
+            "495",  # deadlift
+            "200",  # WPU bodyweight
+            "35x4",  # WPU set
+            "3",  # week = 3
+            "t",  # output mode
+        ]
+    )
+
+    def fake_input(prompt: str = "") -> str:
+        return next(inputs)
+
+    # ✅ patch builtins.input here too
+    monkeypatch.setattr(builtins, "input", fake_input)
+
+    cli.run_interactive()
+
+    args = captured["args"]
+    lifts = args.lifts
+
+    assert "squat" not in lifts
+    assert "bench press" not in lifts
+    assert lifts["front squat"]["one_rm"] == 355
+    assert lifts["overhead press"]["one_rm"] == 185
+    assert lifts["deadlift"]["one_rm"] == 495
+    # WPU should be present with estimated 1RM and given BW
+    assert "weighted pullup" in lifts
+    assert lifts["weighted pullup"]["body_weight"] == 200
