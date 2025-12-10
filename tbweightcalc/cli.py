@@ -18,6 +18,67 @@ from tbweightcalc.program import apply_markdown, markdown_to_pdf
 # -------------------------------------------------------------------
 # Helpers
 # -------------------------------------------------------------------
+# Which exercises are available for interactive mode, grouped into logical “slots”
+
+INTERACTIVE_LIFT_SLOTS = [
+    {
+        "name": "Lower-body main lift",
+        "options": [
+            {
+                "key": "squat",
+                "exercise_name": "squat",
+                "prompt": "Squat 1RM or set (e.g. '455' or '240 5' or '240x5', blank to skip): ",
+            },
+            {
+                "key": "front_squat",
+                "exercise_name": "front squat",
+                "prompt": "Front squat 1RM or set (e.g. '355' or '185 5' or '185x5', blank to skip): ",
+            },
+        ],
+    },
+    {
+        "name": "Upper-body main press",
+        "options": [
+            {
+                "key": "bench",
+                "exercise_name": "bench press",
+                "prompt": "Bench press 1RM or set (e.g. '315' or '225 5' or '225x5', blank to skip): ",
+            },
+            {
+                "key": "overhead_press",
+                "exercise_name": "overhead press",
+                "prompt": "Overhead press 1RM or set (e.g. '185' or '135 5' or '135x5', blank to skip): ",
+            },
+        ],
+    },
+    {
+        "name": "Hinge",
+        "options": [
+            {
+                "key": "deadlift",
+                "exercise_name": "deadlift",
+                "prompt": "Deadlift 1RM or set (e.g. '455' or '315 5' or '315x5', blank to skip): ",
+            },
+        ],
+    },
+    # Weighted pull-up is handled separately because of bodyweight.
+]
+
+
+def _prompt_for_exercise_1rm(exercise_name: str) -> int | None:
+    """
+    Look up the interactive prompt text for the given exercise_name
+    from INTERACTIVE_LIFT_SLOTS and run prompt_lift_one_rm on it.
+
+    Returns an int 1RM, or None if no valid input.
+    """
+    for slot in INTERACTIVE_LIFT_SLOTS:
+        for opt in slot["options"]:
+            if opt["exercise_name"] == exercise_name:
+                return prompt_lift_one_rm(opt["prompt"])
+    # If not found in config, just fall back to a generic prompt.
+    generic = f"{exercise_name.title()} 1RM or set (e.g. '225', '200 5', '200x5', blank to skip): "
+    return prompt_lift_one_rm(generic)
 
 
 def copy_to_clipboard(text: str) -> None:
@@ -63,11 +124,11 @@ def build_program_markdown(args: argparse.Namespace, for_pdf: bool = False) -> s
     """
     Build the Tactical Barbell program markdown.
 
-    for_pdf=False:
-        - includes visible '---' horizontal rules between weeks
-
-    for_pdf=True:
-        - uses raw '\\pagebreak' between weeks (no visible HR in PDF)
+    - If args.lifts is present, it is a dict:
+        { "squat": {"one_rm": 455, "body_weight": None}, ... }
+      and we render based on that.
+    - Otherwise, we fall back to the legacy fixed fields:
+        args.squat, args.bench, args.deadlift, args.weighted_pullup, etc.
     """
     lines: list[str] = []
 
@@ -80,76 +141,74 @@ def build_program_markdown(args: argparse.Namespace, for_pdf: bool = False) -> s
         6: "95%",
     }
 
-    # If week is specified as single week, use that; if "all" or None, do 1–6.
-    if args.week and args.week != "all":
+    # Decide which weeks to print
+    if getattr(args, "week", None) and args.week != "all":
         weeks = [int(args.week)]
     else:
         weeks = list(range(1, 7))
 
+    # ----- Build a unified lifts dict -----
+    if hasattr(args, "lifts") and args.lifts:
+        lifts = args.lifts  # from interactive mode
+    else:
+        # Legacy path — build from old fields for CLI flags.
+        lifts: dict[str, dict] = {}
+        if getattr(args, "squat", None) is not None:
+            lifts["squat"] = {"one_rm": args.squat, "body_weight": None}
+        if getattr(args, "front_squat", None) is not None:
+            lifts["front squat"] = {"one_rm": args.front_squat, "body_weight": None}
+        if getattr(args, "bench", None) is not None:
+            lifts["bench press"] = {"one_rm": args.bench, "body_weight": None}
+        if getattr(args, "overhead_press", None) is not None:
+            lifts["overhead press"] = {
+                "one_rm": args.overhead_press,
+                "body_weight": None,
+            }
+        if getattr(args, "deadlift", None) is not None:
+            lifts["deadlift"] = {"one_rm": args.deadlift, "body_weight": None}
+        wpu = getattr(args, "weighted_pullup", None)
+        if wpu is not None:
+            one_rm, bw = wpu
+            lifts["weighted pullup"] = {"one_rm": one_rm, "body_weight": bw}
+
+    # Define the order in which lifts appear in the output.
+    # Extend this list in the future as you add new exercise types.
+    print_order = [
+        "squat",
+        "front squat",
+        "bench press",
+        "overhead press",
+        "deadlift",
+        "weighted pullup",
+    ]
+
     for week in weeks:
-        # Week header
         lines.append(apply_markdown(f"WEEK {week} - {week_percentages[week]}", "h2"))
         lines.append("")
 
-        # Squat
-        if args.squat is not None:
-            lines.append(
-                tb.Program.print_exercise(
-                    exercise="squat",
-                    oneRepMax=args.squat,
-                    week=week,
-                    body_weight=None,
-                    print_1rm=True,
-                )
-            )
-            lines.append("")
+        for ex_name in print_order:
+            if ex_name not in lifts:
+                continue
+            cfg = lifts[ex_name]
+            one_rm = cfg["one_rm"]
+            body_weight = cfg.get("body_weight")
 
-        # Bench
-        if args.bench is not None:
             lines.append(
                 tb.Program.print_exercise(
-                    exercise="bench press",
-                    oneRepMax=args.bench,
-                    week=week,
-                    body_weight=None,
-                    print_1rm=True,
-                )
-            )
-            lines.append("")
-
-        # Deadlift
-        if args.deadlift is not None:
-            lines.append(
-                tb.Program.print_exercise(
-                    exercise="deadlift",
-                    oneRepMax=args.deadlift,
-                    week=week,
-                    body_weight=None,
-                    print_1rm=True,
-                )
-            )
-            lines.append("")
-
-        # Weighted pull-up
-        if args.weighted_pullup is not None:
-            one_rm, bodyweight = args.weighted_pullup
-            lines.append(
-                tb.Program.print_exercise(
-                    exercise="weighted pullup",
+                    exercise=ex_name,
                     oneRepMax=one_rm,
-                    body_weight=bodyweight,
+                    body_weight=body_weight,
                     week=week,
                     print_1rm=True,
                 )
             )
+            lines.append("")
 
         # Separator between weeks (only if multiple weeks)
         if week != weeks[-1]:
             if for_pdf:
-                # Raw page break for PDF
                 lines.append(r"\pagebreak")
             else:
-                # Visible HR for terminal markdown
                 lines.append("")
                 lines.append(apply_markdown("", "hr"))
                 lines.append("")
@@ -389,8 +448,15 @@ def prompt_one_rm() -> None:
 def run_interactive() -> None:
     """
     Interactive mode when tbcalc is run with no CLI options.
-    Asks for title, 1RMs (or sets to estimate 1RMs), week selection,
-    and output mode (text/pdf/both).
+
+    - Lets you pick a template:
+        [1] Classic: Squat / Bench / Deadlift / Weighted Pull-Up
+        [2] Front-Squat Block: Front Squat / Overhead Press / Deadlift / Weighted Pull-Up
+        [3] Custom: choose lifts per slot
+
+    - Asks for 1RMs/sets using the parse_one_rm_string logic
+    - Handles WPU with bodyweight + set syntax
+    - Builds args.lifts for build_program_markdown
     """
     print("Tactical Barbell Max Strength - Interactive Mode\n")
 
@@ -401,26 +467,110 @@ def run_interactive() -> None:
     else:
         title = f"Tactical Barbell Max Strength: {datetime.date.today():%Y-%m-%d}"
 
-    # --- Squat / Bench / Deadlift 1RMs (with retry on invalid) ---
-    squat = prompt_lift_one_rm("Squat")
-    bench = prompt_lift_one_rm("Bench press")
-    deadlift = prompt_lift_one_rm("Deadlift")
+    # --- Template selection ---
+    print("\nSelect template:")
+    print("  [1] Classic: Squat / Bench / Deadlift / Weighted Pull-Up")
+    print(
+        "  [2] Front-Squat Block: Front Squat / Overhead Press / Deadlift / Weighted Pull-Up"
+    )
+    print("  [3] Custom: choose lifts manually")
+    template_choice = input("Template [1/2/3, default 1]: ").strip()
+    if template_choice not in ("1", "2", "3"):
+        template_choice = "1"
 
-    # --- Weighted pull-ups (with retry for BW and set) ---
-    wpu_one_rm, wpu_bodyweight = prompt_weighted_pullup_interactive()
-    if wpu_one_rm is not None and wpu_bodyweight is not None:
-        weighted_pullup: tuple[int, int] | None = (wpu_one_rm, wpu_bodyweight)
+    lifts: dict[str, dict] = {}
+
+    # ---------- Template 1 & 2: quick combos ----------
+    if template_choice in ("1", "2"):
+        if template_choice == "1":
+            preset_exercises = ["squat", "bench press", "deadlift"]
+        else:
+            preset_exercises = ["front squat", "overhead press", "deadlift"]
+
+        for ex_name in preset_exercises:
+            one_rm = _prompt_for_exercise_1rm(ex_name)
+            if one_rm is not None:
+                lifts[ex_name] = {"one_rm": one_rm, "body_weight": None}
+
+    # ---------- Template 3: fully custom per slot ----------
     else:
-        weighted_pullup = None
+        for slot in INTERACTIVE_LIFT_SLOTS:
+            name = slot["name"]
+            options = slot["options"]
 
-    # --- Week selection ---
-    week_input = input("Week (1–6 or 'all', default 'all'): ").strip().lower()
+            print(f"\n{name}:")
+            for idx, opt in enumerate(options, start=1):
+                print(f"  [{idx}] {opt['exercise_name'].title()}")
+            print("  [s] Skip this slot")
+
+            while True:
+                choice = input("Select option: ").strip().lower()
+                if choice in ("s", ""):
+                    # skip this slot
+                    break
+                try:
+                    idx = int(choice)
+                except ValueError:
+                    print("Invalid choice. Enter a number or 's' to skip.")
+                    continue
+
+                if not (1 <= idx <= len(options)):
+                    print("Invalid option number. Try again.")
+                    continue
+
+                selected = options[idx - 1]
+                ex_name = selected["exercise_name"]
+                prompt_text = selected["prompt"]
+                one_rm = prompt_lift_one_rm(prompt_text)
+                if one_rm is None:
+                    print("No valid 1RM entered; skipping this lift.")
+                    break
+
+                lifts[ex_name] = {"one_rm": one_rm, "body_weight": None}
+                break  # only one selection per slot
+
+    # ---------- Weighted pull-up (common for all templates) ----------
+    weighted_pullup_entry: dict | None = None
+
+    bw_raw = input(
+        "\nBodyweight for weighted pull-ups (lb, blank to skip WPU): "
+    ).strip()
+    if bw_raw:
+        try:
+            bodyweight = int(bw_raw)
+        except ValueError:
+            print("Could not parse bodyweight; skipping weighted pull-ups.")
+            bodyweight = None
+        if bodyweight is not None:
+            while True:
+                wpu_raw = input(
+                    "Weighted pull-up set (e.g. '35 4', '35x4', 'bw 4', 'bw x 4', blank to skip): "
+                ).strip()
+                if not wpu_raw:
+                    break
+                est = parse_weighted_pullup_string(bodyweight, wpu_raw)
+                if est is None:
+                    print(
+                        "Could not parse that set. Try again (or press Enter to skip)."
+                    )
+                    continue
+                weighted_pullup_entry = {
+                    "one_rm": est,
+                    "body_weight": bodyweight,
+                }
+                break
+
+    if weighted_pullup_entry is not None:
+        lifts["weighted pullup"] = weighted_pullup_entry
+
+    # ---------- Week selection ----------
+    week_input = input("\nWeek (1–6 or 'all', default 'all'): ").strip().lower()
     if not week_input:
         week = "all"
     else:
         week = week_input
 
-    # --- Output mode ---
+    # ---------- Output mode ----------
     out_mode = input("Output: [t]ext, [p]df, [b]oth (default b): ").strip().lower()
     if out_mode not in ("t", "p", "b"):
         out_mode = "b"
@@ -428,10 +578,7 @@ def run_interactive() -> None:
     # Build an argparse-like Namespace so we can reuse existing functions
     args = argparse.Namespace(
         week=week,
-        squat=squat,
-        bench=bench,
-        deadlift=deadlift,
-        weighted_pullup=weighted_pullup,
+        lifts=lifts,
         onerm=None,
         title=title,
         pdf=None,
