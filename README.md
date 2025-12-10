@@ -16,6 +16,51 @@ TBWeightCalc is a command-line tool for generating *Tactical Barbell Max Strengt
 
 It is designed for speed, clarity, and usability — perfect for Tactical Barbell strength cycles.
 
+Sample output
+
+```
+# Tactical Barbell Max Strength: 2025-12-09
+
+## WEEK 1 - 70%
+
+### SQUAT
+
+1RM: 455#
+
+- 2 x 5 - 45 lbs - Bar
+- 1 x 5 - 135 lbs - 45
+- 1 x 3 - 190 lbs - 45 25 2.5
+- 1 x 2 - 255 lbs - (45 x 2) 15
+- **(3-5) x 5 - 320 lbs - (45 x 3) 2.5**
+
+
+### BENCH PRESS
+
+1RM: 250#
+
+- 2 x 5 - 45 lbs - Bar
+- 1 x 5 - 95 lbs - 25
+- 1 x 3 - 120 lbs - 35 2.5
+- 1 x 2 - 165 lbs - 45 15
+- **(3-5) x 5 - 175 lbs - 45 15 5**
+
+
+### DEADLIFT
+
+1RM: 300#
+
+- 2 x 5 - 85 lbs - 15 5
+- 1 x 3 - 125 lbs - 35 5
+- 1 x 2 - 185 lbs - 45 25
+- **(1-3) x 5 - 210 lbs - 45 35 2.5**
+
+
+### WEIGHTED PULLUP
+
+1RM: 67# @ BW of 200#
+
+- **(3-5) x 5 - Bodyweight**
+```
 ---
 
 # 🚀 Features
