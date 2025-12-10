@@ -61,6 +61,10 @@ Sample output
 
 - **(3-5) x 5 - Bodyweight**
 ```
+
+
+### Sample PDF output
+![TBCalc PDF Output](docs/sample-pdf-output.png)
 ---
 
 # 🚀 Features
