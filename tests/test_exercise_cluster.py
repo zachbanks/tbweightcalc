@@ -188,9 +188,46 @@ class TestExerciseCluster(unittest.TestCase):
         # self.assertEqual(s.calc_plate_breakdown([45,35,25,10,5,2.5, 1.25]), "???")
 
 
-#############
-# RUN TESTS #
-#############
+import pytest
+from tbweightcalc.exercise_cluster import ExerciseCluster, EXERCISE_PROFILES
 
-if __name__ == "__main__":
-    unittest.main()
+
+def test_profile_exists_for_new_exercises():
+    assert "overhead press" in EXERCISE_PROFILES
+    assert "front squat" in EXERCISE_PROFILES
+
+
+def test_front_squat_generates_sets():
+    c = ExerciseCluster(week=1, exercise="front squat", oneRepMax=300)
+
+    # Should behave like a squat-style lift: 4 warmups + 1 top set
+    assert len(c.sets) == 5
+
+    text = str(c)
+    # Warmup pattern present
+    assert "2 x 5" in text
+    # Top set pattern like (3-5) x 5
+    assert "(3-5) x 5" in text
+
+
+def test_ohp_uses_bench_style_warmups():
+    c = ExerciseCluster(week=1, exercise="overhead press", oneRepMax=200)
+
+    # Should have at least the 4 warmups + 1 top set
+    assert len(c.sets) >= 4
+
+    # At least one non-zero warmup weight before the final top set
+    warmup_weights = [s.weight for s in c.sets[:-1]]
+    assert any(w > 0 for w in warmup_weights)
+
+
+def test_unknown_exercise_returns_empty():
+    c = ExerciseCluster(week=1, exercise="does_not_exist", oneRepMax=200)
+    assert c.sets == []
+
+
+def test_top_sets_follow_week_pattern():
+    c3 = ExerciseCluster(week=3, exercise="squat", oneRepMax=400)
+    c6 = ExerciseCluster(week=6, exercise="squat", oneRepMax=400)
+    assert any("3-4" in str(s) for s in c3.sets)  # week 3 → 3–4 sets
+    assert any("1-2" in str(s) for s in c6.sets)  # week 6 → 1–2 reps
