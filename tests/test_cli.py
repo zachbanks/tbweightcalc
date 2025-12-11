@@ -69,7 +69,7 @@ def test_build_program_markdown_single_week_screen():
     md = cli.build_program_markdown(args, for_pdf=False)
 
     # Should include a WEEK 2 header as an H2
-    assert "## WEEK 2 - 80%" in md
+    assert "WEEK 2 - 80%" in md
     # Should not contain PDF-only pagebreak markers
     assert "\\pagebreak" not in md
 
@@ -187,8 +187,8 @@ def test_main_uses_default_title_when_not_provided(monkeypatch, capsys, tmp_path
     captured = capsys.readouterr()
     stdout = captured.out
 
-    # Should print a heading that starts with "# Tactical Barbell Max Strength:"
-    assert "# Tactical Barbell Max Strength:" in stdout
+    # Should print a heading that starts with the default title
+    assert "Tactical Barbell Max Strength:" in stdout
 
     assert called["title"] is not None
     assert called["title"].startswith("Tactical Barbell Max Strength:")

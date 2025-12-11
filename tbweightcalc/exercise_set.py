@@ -1,5 +1,4 @@
-from typing import List, Optional
-from typing import Iterable
+from typing import Iterable, List, Optional
 
 
 class ExerciseSet:
@@ -25,38 +24,51 @@ class ExerciseSet:
         )
         self.plate_breakdown_on = plate_breakdown_on
 
-    def __str__(self):
-        str, set, rep = "", "", ""
+    def describe(self) -> dict:
+        """Return a formatting-neutral representation of the set."""
 
         # Format sets.
         # 3x5
-        if self.min_set == None:
-            set = "%d" % (self.set)  # 3
+        if self.min_set is None:
+            set_label = "%d" % (self.set)
         # (3-5) x 5
         elif self.min_set >= 0 and self.max_set > 0:
-            set = "(%d-%d)" % (self.min_set, self.max_set)
+            set_label = "(%d-%d)" % (self.min_set, self.max_set)
+        else:
+            set_label = ""
 
         # Format reps
         # Single digit reps only ie 3x5
-        if self.min_reps == None:
-            rep = "%d" % (self.max_reps)
+        if self.min_reps is None:
+            rep_label = "%d" % (self.max_reps)
         elif self.min_reps >= 0 and self.max_reps > 0:
-            rep = "(%d-%d)" % (self.min_reps, self.max_reps)
-
-        # Combine set and rep strings
-        str = "%s x %s" % (set, rep)  # 3x5 or (3-4)x(1-2)
-
-        if self.weight <= 0 and self.bar == False:
-            # Plate breakdown = Bodyweight
-            str += " - %s" % self.plate_breakdown
+            rep_label = "(%d-%d)" % (self.min_reps, self.max_reps)
         else:
-            str += " - %d lbs" % (self.weight)
+            rep_label = ""
 
-        # Add plate breakdown
-        if self.plate_breakdown_on:
-            str += " - %s" % self.plate_breakdown
+        set_rep = "%s x %s" % (set_label, rep_label)
 
-        return str
+        if self.weight <= 0 and self.bar is False:
+            weight_label = self.plate_breakdown
+            breakdown = None
+        else:
+            weight_label = "%d lbs" % (self.weight)
+            breakdown = self.plate_breakdown if self.plate_breakdown_on else None
+
+        return {
+            "set_rep": set_rep,
+            "weight_label": weight_label,
+            "plate_breakdown": breakdown,
+        }
+
+    def __str__(self):
+        info = self.describe()
+        parts = [f"{info['set_rep']} - {info['weight_label']}"]
+
+        if info["plate_breakdown"]:
+            parts.append(info["plate_breakdown"])
+
+        return " - ".join(parts)
 
     #######################
     # SETTERS AND GETTERS #

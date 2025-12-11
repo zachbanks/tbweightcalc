@@ -1,5 +1,5 @@
 from .exercise_set import ExerciseSet, optimize_warmup_weight
-from .program import apply_markdown
+from .formatting import Formatter, PlainFormatter
 
 # ---------------------------------------------------------------------------
 # EXERCISE PROFILE DEFINITIONS
@@ -179,25 +179,42 @@ class ExerciseCluster:
     OHP = "overhead press"
     FRONT_SQUAT = "front squat"
 
-    def __init__(self, week=1, exercise="", oneRepMax=0, body_weight=None):
+    def __init__(
+        self,
+        week=1,
+        exercise="",
+        oneRepMax=0,
+        body_weight=None,
+        formatter: Formatter | None = None,
+    ):
         self.week = week
         self.exercise = exercise
         self.oneRepMax = oneRepMax
         self.body_weight = body_weight
         self.sets: list[ExerciseSet] = []
+        self.formatter = formatter or PlainFormatter()
         self.calc_sets()
 
     def __str__(self):
-        out = ""
+        return self.render()
+
+    def render(self, formatter: Formatter | None = None) -> str:
+        fmt = formatter or self.formatter or PlainFormatter()
+        out = []
         last = len(self.sets) - 1
 
         for i, s in enumerate(self.sets):
-            text = str(s)
-            if i == last:
-                text = apply_markdown(text, "bold")
-            out += apply_markdown(text + "\n", "ul")
+            info = s.describe()
+            line = f"{info['set_rep']} - {info['weight_label']}"
+            if info["plate_breakdown"]:
+                line += f" - {info['plate_breakdown']}"
 
-        return out
+            if i == last:
+                line = fmt.bold(line)
+
+            out.append(fmt.list_item(line))
+
+        return "\n".join(out)
 
     def __getitem__(self, item):
         return self.sets[item]

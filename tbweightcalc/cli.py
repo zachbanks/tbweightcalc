@@ -11,8 +11,9 @@ from pathlib import Path
 from typing import Optional
 
 import tbweightcalc as tb
+from tbweightcalc.formatting import Formatter, MarkdownFormatter, PlainFormatter
 from tbweightcalc.onerm import calculate_one_rm
-from tbweightcalc.program import apply_markdown, markdown_to_pdf
+from tbweightcalc.program import markdown_to_pdf
 
 
 # -------------------------------------------------------------------
@@ -120,7 +121,11 @@ def default_pdf_path(title: Optional[str]) -> Path:
     return downloads / safe
 
 
-def build_program_markdown(args: argparse.Namespace, for_pdf: bool = False) -> str:
+def build_program_markdown(
+    args: argparse.Namespace,
+    for_pdf: bool = False,
+    formatter: Formatter | None = None,
+) -> str:
     """
     Build the Tactical Barbell program markdown.
 
@@ -130,6 +135,10 @@ def build_program_markdown(args: argparse.Namespace, for_pdf: bool = False) -> s
     - Otherwise, we fall back to the legacy fixed fields:
         args.squat, args.bench, args.deadlift, args.weighted_pullup, etc.
     """
+    fmt = formatter
+    if fmt is None:
+        fmt = MarkdownFormatter() if for_pdf else PlainFormatter()
+
     lines: list[str] = []
 
     week_percentages = {
@@ -183,7 +192,7 @@ def build_program_markdown(args: argparse.Namespace, for_pdf: bool = False) -> s
     ]
 
     for week in weeks:
-        lines.append(apply_markdown(f"WEEK {week} - {week_percentages[week]}", "h2"))
+        lines.append(fmt.heading(f"WEEK {week} - {week_percentages[week]}", level=2))
         lines.append("")
 
         for ex_name in print_order:
@@ -198,6 +207,7 @@ def build_program_markdown(args: argparse.Namespace, for_pdf: bool = False) -> s
                     exercise=ex_name,
                     oneRepMax=one_rm,
                     body_weight=body_weight,
+                    formatter=fmt,
                     week=week,
                     print_1rm=True,
                 )
@@ -210,7 +220,7 @@ def build_program_markdown(args: argparse.Namespace, for_pdf: bool = False) -> s
                 lines.append(r"\pagebreak")
             else:
                 lines.append("")
-                lines.append(apply_markdown("", "hr"))
+                lines.append(fmt.horizontal_rule())
                 lines.append("")
 
     return "\n".join(lines).rstrip()
@@ -688,9 +698,14 @@ def main() -> None:
     else:
         title = f"Tactical Barbell Max Strength: {datetime.date.today():%Y-%m-%d}"
 
-    # 1) Build markdown for screen (with visible ---)
-    screen_body = build_program_markdown(args, for_pdf=False)
-    screen_output = f"# {title}\n\n{screen_body}"
+    screen_formatter = PlainFormatter()
+    pdf_formatter = MarkdownFormatter()
+
+    # 1) Build plain text for screen (with visible ---)
+    screen_body = build_program_markdown(
+        args, for_pdf=False, formatter=screen_formatter
+    )
+    screen_output = f"{screen_formatter.heading(title, level=1)}\n\n{screen_body}"
 
     # Print to stdout
     print(screen_output)
@@ -699,7 +714,7 @@ def main() -> None:
     copy_to_clipboard(screen_output)
 
     # 3) Build markdown for PDF (with page breaks, no visible hr)
-    pdf_body = build_program_markdown(args, for_pdf=True)
+    pdf_body = build_program_markdown(args, for_pdf=True, formatter=pdf_formatter)
 
     # Determine PDF path:
     #   - If user passed --pdf, honor that
