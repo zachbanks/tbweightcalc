@@ -364,3 +364,16 @@ class TestOptimizeWarmupWeight:
             available_plates=[55, 45, 25, 10, 5],
         )
         assert result == 165
+
+    def test_rounds_up_to_match_next_big_plate(self):
+        # Current warm-up: 120 total -> per-side = 37.5 (35 + 2.5)
+        # Next set: 165 total -> per-side = 60 (will use a 45)
+        # With lookahead, the 120 set should round up to 135 (a single 45/side)
+        result = es.optimize_warmup_weight(120, next_total_weight=165)
+        assert result == 135
+
+    def test_does_not_force_big_plate_when_too_far(self):
+        # Current warm-up: 95 total -> per-side = 25
+        # Next set: heavy enough for 45s, but gap is 20 lb/side (> big_plate_slack)
+        result = es.optimize_warmup_weight(95, next_total_weight=225)
+        assert result == 95

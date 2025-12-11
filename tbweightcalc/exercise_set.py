@@ -289,11 +289,19 @@ def optimize_warmup_weight(
     bar_weight: float = 45.0,
     available_plates: Iterable[float] | None = None,
     threshold: float = 2.5,
+    next_total_weight: float | None = None,
+    big_plate_min: float = 45.0,
+    big_plate_slack: float = 10.0,
 ) -> float:
     """
     For warm-up sets ONLY:
       Try to reduce plate clutter on each side by rounding the *small plates*
       up to a single plate if the difference is within `threshold`.
+
+    Additionally, if the *next* set will require a "big" plate (>=
+    ``big_plate_min``) and the current per-side load is reasonably close to
+    that plate (within ``big_plate_slack``), round UP to that big plate so the
+    bar is pre-loaded for the upcoming set.
 
     Per-side logic:
       per_side = (total - bar) / 2
@@ -339,6 +347,20 @@ def optimize_warmup_weight(
     per_side = (total_weight - bar_weight) / 2.0
     if per_side <= 0:
         return total_weight
+
+    # Prefer pre-loading a big plate if the next set will use one soon and
+    # we're close enough to justify the jump.
+    if next_total_weight and next_total_weight > bar_weight:
+        next_per_side = (next_total_weight - bar_weight) / 2.0
+        big_candidates = [
+            p for p in plates_sorted if p >= big_plate_min and p <= next_per_side
+        ]
+        next_big_plate = max(big_candidates) if big_candidates else None
+
+        if next_big_plate and per_side < next_big_plate:
+            gap = next_big_plate - per_side
+            if gap <= big_plate_slack:
+                return bar_weight + 2.0 * next_big_plate
 
     # 1) Peel off as many largest plates as possible (base stack of 45s, 35s, etc.)
     largest = max(plates_sorted)

@@ -261,6 +261,8 @@ class ExerciseCluster:
         # Top sets
         setdefs.extend(_build_top_sets(self.exercise, self.week))
 
+        # First pass: build all sets and compute raw weights
+        built_sets: list[ExerciseSet] = []
         for d in setdefs:
             s = ExerciseSet()
 
@@ -288,14 +290,6 @@ class ExerciseCluster:
             if kind == "barbell":
                 s.calc_lifting_weight(self.working_weight, d["multiplier"])
 
-                # Warm-up plate optimization only when multiplier < 1.0
-                if d.get("multiplier", 1.0) < 1.0:
-                    s.weight = optimize_warmup_weight(
-                        total_weight=s.weight,
-                        bar_weight=45.0,
-                        threshold=2.5,
-                    )
-
             # WEIGHTED PULLUPS ----------------------------------------------
             elif kind == "wpu":
                 s.bar = False
@@ -307,4 +301,23 @@ class ExerciseCluster:
                 # Plate breakdown only when total weight > 45#
                 s.plate_breakdown_on = s.weight > 45
 
-            self.add(s)
+            built_sets.append(s)
+
+        # Second pass: apply warmup optimization with lookahead
+        if profile["kind"] == "barbell":
+            for idx, (d, s) in enumerate(zip(setdefs, built_sets)):
+                if d.get("multiplier", 1.0) < 1.0:
+                    next_weight = None
+                    for next_set in built_sets[idx + 1 :]:
+                        next_weight = next_set.weight
+                        break
+
+                    s.weight = optimize_warmup_weight(
+                        total_weight=s.weight,
+                        bar_weight=45.0,
+                        threshold=2.5,
+                        next_total_weight=next_weight,
+                    )
+
+        # Save sets
+        self.sets = built_sets

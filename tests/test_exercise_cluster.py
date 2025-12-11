@@ -231,3 +231,14 @@ def test_top_sets_follow_week_pattern():
     c6 = ExerciseCluster(week=6, exercise="squat", oneRepMax=400)
     assert any("3-4" in str(s) for s in c3.sets)  # week 3 → 3–4 sets
     assert any("1-2" in str(s) for s in c6.sets)  # week 6 → 1–2 reps
+
+
+def test_bench_warmup_rounds_up_for_next_big_plate():
+    """If the next set needs 45s, the prior warmup should load them early."""
+
+    c = ExerciseCluster(week=1, exercise=ExerciseCluster.BENCHPRESS, oneRepMax=345)
+
+    # Bench warmups (4 total) should round the second warmup (0.5 multiplier)
+    # up from 120 to 135 so the 45s stay on for the next set.
+    warmup_weights = [s.weight for s in c.sets[:4]]
+    assert warmup_weights[1] == 135
