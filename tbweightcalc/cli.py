@@ -11,8 +11,9 @@ from pathlib import Path
 from typing import Optional
 
 import tbweightcalc as tb
+from tbweightcalc.formatting import Formatter, MarkdownFormatter, PlainFormatter
 from tbweightcalc.onerm import calculate_one_rm
-from tbweightcalc.program import apply_markdown, markdown_to_pdf
+from tbweightcalc.program import markdown_to_pdf
 
 
 # -------------------------------------------------------------------
@@ -33,6 +34,11 @@ INTERACTIVE_LIFT_SLOTS = [
                 "key": "front_squat",
                 "exercise_name": "front squat",
                 "prompt": "Front squat 1RM or set (e.g. '355' or '185 5' or '185x5', blank to skip): ",
+            },
+            {
+                "key": "zercher_squat",
+                "exercise_name": "zercher squat",
+                "prompt": "Zercher squat 1RM or set (e.g. '315' or '225 5' or '225x5', blank to skip): ",
             },
         ],
     },
@@ -58,6 +64,16 @@ INTERACTIVE_LIFT_SLOTS = [
                 "key": "deadlift",
                 "exercise_name": "deadlift",
                 "prompt": "Deadlift 1RM or set (e.g. '455' or '315 5' or '315x5', blank to skip): ",
+            },
+            {
+                "key": "zercher_deadlift",
+                "exercise_name": "zercher deadlift",
+                "prompt": "Zercher deadlift 1RM or set (e.g. '405' or '275 5' or '275x5', blank to skip): ",
+            },
+            {
+                "key": "trap_bar_deadlift",
+                "exercise_name": "trap bar deadlift",
+                "prompt": "Trap bar deadlift 1RM or set (e.g. '500' or '365 5' or '365x5', blank to skip): ",
             },
         ],
     },
@@ -120,7 +136,11 @@ def default_pdf_path(title: Optional[str]) -> Path:
     return downloads / safe
 
 
-def build_program_markdown(args: argparse.Namespace, for_pdf: bool = False) -> str:
+def build_program_markdown(
+    args: argparse.Namespace,
+    for_pdf: bool = False,
+    formatter: Formatter | None = None,
+) -> str:
     """
     Build the Tactical Barbell program markdown.
 
@@ -130,6 +150,10 @@ def build_program_markdown(args: argparse.Namespace, for_pdf: bool = False) -> s
     - Otherwise, we fall back to the legacy fixed fields:
         args.squat, args.bench, args.deadlift, args.weighted_pullup, etc.
     """
+    fmt = formatter
+    if fmt is None:
+        fmt = MarkdownFormatter() if for_pdf else PlainFormatter()
+
     lines: list[str] = []
 
     week_percentages = {
@@ -157,6 +181,8 @@ def build_program_markdown(args: argparse.Namespace, for_pdf: bool = False) -> s
             lifts["squat"] = {"one_rm": args.squat, "body_weight": None}
         if getattr(args, "front_squat", None) is not None:
             lifts["front squat"] = {"one_rm": args.front_squat, "body_weight": None}
+        if getattr(args, "zercher_squat", None) is not None:
+            lifts["zercher squat"] = {"one_rm": args.zercher_squat, "body_weight": None}
         if getattr(args, "bench", None) is not None:
             lifts["bench press"] = {"one_rm": args.bench, "body_weight": None}
         if getattr(args, "overhead_press", None) is not None:
@@ -166,6 +192,10 @@ def build_program_markdown(args: argparse.Namespace, for_pdf: bool = False) -> s
             }
         if getattr(args, "deadlift", None) is not None:
             lifts["deadlift"] = {"one_rm": args.deadlift, "body_weight": None}
+        if getattr(args, "zercher_deadlift", None) is not None:
+            lifts["zercher deadlift"] = {"one_rm": args.zercher_deadlift, "body_weight": None}
+        if getattr(args, "trap_bar_deadlift", None) is not None:
+            lifts["trap bar deadlift"] = {"one_rm": args.trap_bar_deadlift, "body_weight": None}
         wpu = getattr(args, "weighted_pullup", None)
         if wpu is not None:
             one_rm, bw = wpu
@@ -176,14 +206,17 @@ def build_program_markdown(args: argparse.Namespace, for_pdf: bool = False) -> s
     print_order = [
         "squat",
         "front squat",
+        "zercher squat",
         "bench press",
         "overhead press",
         "deadlift",
+        "zercher deadlift",
+        "trap bar deadlift",
         "weighted pullup",
     ]
 
     for week in weeks:
-        lines.append(apply_markdown(f"WEEK {week} - {week_percentages[week]}", "h2"))
+        lines.append(fmt.heading(f"WEEK {week} - {week_percentages[week]}", level=2))
         lines.append("")
 
         for ex_name in print_order:
@@ -198,6 +231,7 @@ def build_program_markdown(args: argparse.Namespace, for_pdf: bool = False) -> s
                     exercise=ex_name,
                     oneRepMax=one_rm,
                     body_weight=body_weight,
+                    formatter=fmt,
                     week=week,
                     print_1rm=True,
                 )
@@ -210,7 +244,7 @@ def build_program_markdown(args: argparse.Namespace, for_pdf: bool = False) -> s
                 lines.append(r"\pagebreak")
             else:
                 lines.append("")
-                lines.append(apply_markdown("", "hr"))
+                lines.append(fmt.horizontal_rule())
                 lines.append("")
 
     return "\n".join(lines).rstrip()
@@ -625,9 +659,19 @@ def main() -> None:
 
     parser.add_argument("-sq", "--squat", help="Enter 1RM for Squat", type=int)
 
+    parser.add_argument("-fsq", "--front-squat", help="Enter 1RM for Front Squat", type=int, dest="front_squat")
+
+    parser.add_argument("-zsq", "--zercher-squat", help="Enter 1RM for Zercher Squat", type=int, dest="zercher_squat")
+
     parser.add_argument("-bp", "--bench", help="Enter 1RM for Bench Press", type=int)
 
+    parser.add_argument("-ohp", "--overhead-press", help="Enter 1RM for Overhead Press", type=int, dest="overhead_press")
+
     parser.add_argument("-dl", "--deadlift", help="Enter 1RM for Deadlift", type=int)
+
+    parser.add_argument("-zdl", "--zercher-deadlift", help="Enter 1RM for Zercher Deadlift", type=int, dest="zercher_deadlift")
+
+    parser.add_argument("-tbdl", "--trap-bar-deadlift", help="Enter 1RM for Trap Bar Deadlift", type=int, dest="trap_bar_deadlift")
 
     parser.add_argument(
         "-wpu",
@@ -691,9 +735,14 @@ def main() -> None:
     else:
         title = f"Tactical Barbell Max Strength: {datetime.date.today():%Y-%m-%d}"
 
-    # 1) Build markdown for screen (with visible ---)
-    screen_body = build_program_markdown(args, for_pdf=False)
-    screen_output = f"# {title}\n\n{screen_body}"
+    screen_formatter = PlainFormatter()
+    pdf_formatter = MarkdownFormatter()
+
+    # 1) Build plain text for screen (with visible ---)
+    screen_body = build_program_markdown(
+        args, for_pdf=False, formatter=screen_formatter
+    )
+    screen_output = f"{screen_formatter.heading(title, level=1)}\n\n{screen_body}"
 
     # Print to stdout
     print(screen_output)
@@ -702,7 +751,7 @@ def main() -> None:
     copy_to_clipboard(screen_output)
 
     # 3) Build markdown for PDF (with page breaks, no visible hr)
-    pdf_body = build_program_markdown(args, for_pdf=True)
+    pdf_body = build_program_markdown(args, for_pdf=True, formatter=pdf_formatter)
 
     # Determine PDF path:
     #   - If user passed --pdf, honor that

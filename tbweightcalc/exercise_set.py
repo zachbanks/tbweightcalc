@@ -1,5 +1,4 @@
-from typing import List, Optional
-from typing import Iterable
+from typing import Iterable, List, Optional
 
 
 class ExerciseSet:
@@ -25,38 +24,51 @@ class ExerciseSet:
         )
         self.plate_breakdown_on = plate_breakdown_on
 
-    def __str__(self):
-        str, set, rep = "", "", ""
+    def describe(self) -> dict:
+        """Return a formatting-neutral representation of the set."""
 
         # Format sets.
         # 3x5
-        if self.min_set == None:
-            set = "%d" % (self.set)  # 3
+        if self.min_set is None:
+            set_label = "%d" % (self.set)
         # (3-5) x 5
         elif self.min_set >= 0 and self.max_set > 0:
-            set = "(%d-%d)" % (self.min_set, self.max_set)
+            set_label = "(%d-%d)" % (self.min_set, self.max_set)
+        else:
+            set_label = ""
 
         # Format reps
         # Single digit reps only ie 3x5
-        if self.min_reps == None:
-            rep = "%d" % (self.max_reps)
+        if self.min_reps is None:
+            rep_label = "%d" % (self.max_reps)
         elif self.min_reps >= 0 and self.max_reps > 0:
-            rep = "(%d-%d)" % (self.min_reps, self.max_reps)
-
-        # Combine set and rep strings
-        str = "%s x %s" % (set, rep)  # 3x5 or (3-4)x(1-2)
-
-        if self.weight <= 0 and self.bar == False:
-            # Plate breakdown = Bodyweight
-            str += " - %s" % self.plate_breakdown
+            rep_label = "(%d-%d)" % (self.min_reps, self.max_reps)
         else:
-            str += " - %d lbs" % (self.weight)
+            rep_label = ""
 
-        # Add plate breakdown
-        if self.plate_breakdown_on:
-            str += " - %s" % self.plate_breakdown
+        set_rep = "%s x %s" % (set_label, rep_label)
 
-        return str
+        if self.weight <= 0 and self.bar is False:
+            weight_label = self.plate_breakdown
+            breakdown = None
+        else:
+            weight_label = "%d lbs" % (self.weight)
+            breakdown = self.plate_breakdown if self.plate_breakdown_on else None
+
+        return {
+            "set_rep": set_rep,
+            "weight_label": weight_label,
+            "plate_breakdown": breakdown,
+        }
+
+    def __str__(self):
+        info = self.describe()
+        parts = [f"{info['set_rep']} - {info['weight_label']}"]
+
+        if info["plate_breakdown"]:
+            parts.append(info["plate_breakdown"])
+
+        return " - ".join(parts)
 
     #######################
     # SETTERS AND GETTERS #
@@ -289,11 +301,19 @@ def optimize_warmup_weight(
     bar_weight: float = 45.0,
     available_plates: Iterable[float] | None = None,
     threshold: float = 2.5,
+    next_total_weight: float | None = None,
+    big_plate_min: float = 45.0,
+    big_plate_slack: float = 10.0,
 ) -> float:
     """
     For warm-up sets ONLY:
       Try to reduce plate clutter on each side by rounding the *small plates*
       up to a single plate if the difference is within `threshold`.
+
+    Additionally, if the *next* set will require a "big" plate (>=
+    ``big_plate_min``) and the current per-side load is reasonably close to
+    that plate (within ``big_plate_slack``), round UP to that big plate so the
+    bar is pre-loaded for the upcoming set.
 
     Per-side logic:
       per_side = (total - bar) / 2
@@ -339,6 +359,20 @@ def optimize_warmup_weight(
     per_side = (total_weight - bar_weight) / 2.0
     if per_side <= 0:
         return total_weight
+
+    # Prefer pre-loading a big plate if the next set will use one soon and
+    # we're close enough to justify the jump.
+    if next_total_weight and next_total_weight > bar_weight:
+        next_per_side = (next_total_weight - bar_weight) / 2.0
+        big_candidates = [
+            p for p in plates_sorted if p >= big_plate_min and p <= next_per_side
+        ]
+        next_big_plate = max(big_candidates) if big_candidates else None
+
+        if next_big_plate and per_side < next_big_plate:
+            gap = next_big_plate - per_side
+            if gap <= big_plate_slack:
+                return bar_weight + 2.0 * next_big_plate
 
     # 1) Peel off as many largest plates as possible (base stack of 45s, 35s, etc.)
     largest = max(plates_sorted)

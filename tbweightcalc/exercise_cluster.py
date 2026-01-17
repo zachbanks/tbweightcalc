@@ -1,5 +1,5 @@
 from .exercise_set import ExerciseSet, optimize_warmup_weight
-from .program import apply_markdown
+from .formatting import Formatter, PlainFormatter
 
 # ---------------------------------------------------------------------------
 # EXERCISE PROFILE DEFINITIONS
@@ -16,6 +16,11 @@ EXERCISE_PROFILES = {
         "warmup_scheme": "squat_bench",
         "top_scheme": "squat_bench",
     },
+    "zercher squat": {
+        "kind": "barbell",
+        "warmup_scheme": "squat_bench",
+        "top_scheme": "squat_bench",
+    },
     "bench press": {
         "kind": "barbell",
         "warmup_scheme": "squat_bench",  # behaves like squat warmups but tweaked
@@ -27,6 +32,16 @@ EXERCISE_PROFILES = {
         "top_scheme": "squat_bench",
     },
     "deadlift": {
+        "kind": "barbell",
+        "warmup_scheme": "deadlift",
+        "top_scheme": "deadlift",
+    },
+    "zercher deadlift": {
+        "kind": "barbell",
+        "warmup_scheme": "deadlift",
+        "top_scheme": "deadlift",
+    },
+    "trap bar deadlift": {
         "kind": "barbell",
         "warmup_scheme": "deadlift",
         "top_scheme": "deadlift",
@@ -175,29 +190,49 @@ class ExerciseCluster:
     SQUAT = "squat"
     BENCHPRESS = "bench press"
     DEADLIFT = "deadlift"
+    ZERCHER_DEADLIFT = "zercher deadlift"
+    TRAP_BAR_DEADLIFT = "trap bar deadlift"
     WPU = "weighted pullup"
     OHP = "overhead press"
     FRONT_SQUAT = "front squat"
+    ZERCHER_SQUAT = "zercher squat"
 
-    def __init__(self, week=1, exercise="", oneRepMax=0, body_weight=None):
+    def __init__(
+        self,
+        week=1,
+        exercise="",
+        oneRepMax=0,
+        body_weight=None,
+        formatter: Formatter | None = None,
+    ):
         self.week = week
         self.exercise = exercise
         self.oneRepMax = oneRepMax
         self.body_weight = body_weight
         self.sets: list[ExerciseSet] = []
+        self.formatter = formatter or PlainFormatter()
         self.calc_sets()
 
     def __str__(self):
-        out = ""
+        return self.render()
+
+    def render(self, formatter: Formatter | None = None) -> str:
+        fmt = formatter or self.formatter or PlainFormatter()
+        out = []
         last = len(self.sets) - 1
 
         for i, s in enumerate(self.sets):
-            text = str(s)
-            if i == last:
-                text = apply_markdown(text, "bold")
-            out += apply_markdown(text + "\n", "ul")
+            info = s.describe()
+            line = f"{info['set_rep']} - {info['weight_label']}"
+            if info["plate_breakdown"]:
+                line += f" - {info['plate_breakdown']}"
 
-        return out
+            if i == last:
+                line = fmt.bold(line)
+
+            out.append(fmt.list_item(line))
+
+        return "\n".join(out)
 
     def __getitem__(self, item):
         return self.sets[item]
@@ -261,6 +296,8 @@ class ExerciseCluster:
         # Top sets
         setdefs.extend(_build_top_sets(self.exercise, self.week))
 
+        # First pass: build all sets and compute raw weights
+        built_sets: list[ExerciseSet] = []
         for d in setdefs:
             s = ExerciseSet()
 
@@ -288,14 +325,6 @@ class ExerciseCluster:
             if kind == "barbell":
                 s.calc_lifting_weight(self.working_weight, d["multiplier"])
 
-                # Warm-up plate optimization only when multiplier < 1.0
-                if d.get("multiplier", 1.0) < 1.0:
-                    s.weight = optimize_warmup_weight(
-                        total_weight=s.weight,
-                        bar_weight=45.0,
-                        threshold=2.5,
-                    )
-
             # WEIGHTED PULLUPS ----------------------------------------------
             elif kind == "wpu":
                 s.bar = False
@@ -307,4 +336,23 @@ class ExerciseCluster:
                 # Plate breakdown only when total weight > 45#
                 s.plate_breakdown_on = s.weight > 45
 
-            self.add(s)
+            built_sets.append(s)
+
+        # Second pass: apply warmup optimization with lookahead
+        if profile["kind"] == "barbell":
+            for idx, (d, s) in enumerate(zip(setdefs, built_sets)):
+                if d.get("multiplier", 1.0) < 1.0:
+                    next_weight = None
+                    for next_set in built_sets[idx + 1 :]:
+                        next_weight = next_set.weight
+                        break
+
+                    s.weight = optimize_warmup_weight(
+                        total_weight=s.weight,
+                        bar_weight=45.0,
+                        threshold=2.5,
+                        next_total_weight=next_weight,
+                    )
+
+        # Save sets
+        self.sets = built_sets
