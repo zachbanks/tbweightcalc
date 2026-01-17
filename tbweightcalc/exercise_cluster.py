@@ -16,6 +16,11 @@ EXERCISE_PROFILES = {
         "warmup_scheme": "squat_bench",
         "top_scheme": "squat_bench",
     },
+    "zercher squat": {
+        "kind": "barbell",
+        "warmup_scheme": "squat_bench",
+        "top_scheme": "squat_bench",
+    },
     "bench press": {
         "kind": "barbell",
         "warmup_scheme": "squat_bench",  # behaves like squat warmups but tweaked
@@ -27,6 +32,16 @@ EXERCISE_PROFILES = {
         "top_scheme": "squat_bench",
     },
     "deadlift": {
+        "kind": "barbell",
+        "warmup_scheme": "deadlift",
+        "top_scheme": "deadlift",
+    },
+    "zercher deadlift": {
+        "kind": "barbell",
+        "warmup_scheme": "deadlift",
+        "top_scheme": "deadlift",
+    },
+    "trap bar deadlift": {
         "kind": "barbell",
         "warmup_scheme": "deadlift",
         "top_scheme": "deadlift",
@@ -175,9 +190,12 @@ class ExerciseCluster:
     SQUAT = "squat"
     BENCHPRESS = "bench press"
     DEADLIFT = "deadlift"
+    ZERCHER_DEADLIFT = "zercher deadlift"
+    TRAP_BAR_DEADLIFT = "trap bar deadlift"
     WPU = "weighted pullup"
     OHP = "overhead press"
     FRONT_SQUAT = "front squat"
+    ZERCHER_SQUAT = "zercher squat"
 
     def __init__(
         self,

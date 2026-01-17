@@ -195,6 +195,9 @@ from tbweightcalc.exercise_cluster import ExerciseCluster, EXERCISE_PROFILES
 def test_profile_exists_for_new_exercises():
     assert "overhead press" in EXERCISE_PROFILES
     assert "front squat" in EXERCISE_PROFILES
+    assert "zercher squat" in EXERCISE_PROFILES
+    assert "zercher deadlift" in EXERCISE_PROFILES
+    assert "trap bar deadlift" in EXERCISE_PROFILES
 
 
 def test_front_squat_generates_sets():
@@ -208,6 +211,45 @@ def test_front_squat_generates_sets():
     assert "2 x 5" in text
     # Top set pattern like (3-5) x 5
     assert "(3-5) x 5" in text
+
+
+def test_zercher_squat_generates_sets():
+    c = ExerciseCluster(week=1, exercise="zercher squat", oneRepMax=315)
+
+    # Should behave like a squat-style lift: 4 warmups + 1 top set
+    assert len(c.sets) == 5
+
+    text = str(c)
+    # Warmup pattern present
+    assert "2 x 5" in text
+    # Top set pattern like (3-5) x 5
+    assert "(3-5) x 5" in text
+
+
+def test_zercher_deadlift_uses_deadlift_scheme():
+    c = ExerciseCluster(week=1, exercise="zercher deadlift", oneRepMax=405)
+
+    # Deadlift style: 3 warmups + 1 top set
+    assert len(c.sets) == 4
+
+    text = str(c)
+    # Deadlift warmup pattern (no bar-only set)
+    assert "2 x 5" in text
+    # Top set pattern like (1-3) x 5
+    assert "(1-3) x 5" in text
+
+
+def test_trap_bar_deadlift_uses_deadlift_scheme():
+    c = ExerciseCluster(week=1, exercise="trap bar deadlift", oneRepMax=500)
+
+    # Deadlift style: 3 warmups + 1 top set
+    assert len(c.sets) == 4
+
+    text = str(c)
+    # Deadlift warmup pattern
+    assert "2 x 5" in text
+    # Top set pattern like (1-3) x 5
+    assert "(1-3) x 5" in text
 
 
 def test_ohp_uses_bench_style_warmups():

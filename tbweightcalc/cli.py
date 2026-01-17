@@ -35,6 +35,11 @@ INTERACTIVE_LIFT_SLOTS = [
                 "exercise_name": "front squat",
                 "prompt": "Front squat 1RM or set (e.g. '355' or '185 5' or '185x5', blank to skip): ",
             },
+            {
+                "key": "zercher_squat",
+                "exercise_name": "zercher squat",
+                "prompt": "Zercher squat 1RM or set (e.g. '315' or '225 5' or '225x5', blank to skip): ",
+            },
         ],
     },
     {
@@ -59,6 +64,16 @@ INTERACTIVE_LIFT_SLOTS = [
                 "key": "deadlift",
                 "exercise_name": "deadlift",
                 "prompt": "Deadlift 1RM or set (e.g. '455' or '315 5' or '315x5', blank to skip): ",
+            },
+            {
+                "key": "zercher_deadlift",
+                "exercise_name": "zercher deadlift",
+                "prompt": "Zercher deadlift 1RM or set (e.g. '405' or '275 5' or '275x5', blank to skip): ",
+            },
+            {
+                "key": "trap_bar_deadlift",
+                "exercise_name": "trap bar deadlift",
+                "prompt": "Trap bar deadlift 1RM or set (e.g. '500' or '365 5' or '365x5', blank to skip): ",
             },
         ],
     },
@@ -166,6 +181,8 @@ def build_program_markdown(
             lifts["squat"] = {"one_rm": args.squat, "body_weight": None}
         if getattr(args, "front_squat", None) is not None:
             lifts["front squat"] = {"one_rm": args.front_squat, "body_weight": None}
+        if getattr(args, "zercher_squat", None) is not None:
+            lifts["zercher squat"] = {"one_rm": args.zercher_squat, "body_weight": None}
         if getattr(args, "bench", None) is not None:
             lifts["bench press"] = {"one_rm": args.bench, "body_weight": None}
         if getattr(args, "overhead_press", None) is not None:
@@ -175,6 +192,10 @@ def build_program_markdown(
             }
         if getattr(args, "deadlift", None) is not None:
             lifts["deadlift"] = {"one_rm": args.deadlift, "body_weight": None}
+        if getattr(args, "zercher_deadlift", None) is not None:
+            lifts["zercher deadlift"] = {"one_rm": args.zercher_deadlift, "body_weight": None}
+        if getattr(args, "trap_bar_deadlift", None) is not None:
+            lifts["trap bar deadlift"] = {"one_rm": args.trap_bar_deadlift, "body_weight": None}
         wpu = getattr(args, "weighted_pullup", None)
         if wpu is not None:
             one_rm, bw = wpu
@@ -185,9 +206,12 @@ def build_program_markdown(
     print_order = [
         "squat",
         "front squat",
+        "zercher squat",
         "bench press",
         "overhead press",
         "deadlift",
+        "zercher deadlift",
+        "trap bar deadlift",
         "weighted pullup",
     ]
 
@@ -632,9 +656,19 @@ def main() -> None:
 
     parser.add_argument("-sq", "--squat", help="Enter 1RM for Squat", type=int)
 
+    parser.add_argument("-fsq", "--front-squat", help="Enter 1RM for Front Squat", type=int, dest="front_squat")
+
+    parser.add_argument("-zsq", "--zercher-squat", help="Enter 1RM for Zercher Squat", type=int, dest="zercher_squat")
+
     parser.add_argument("-bp", "--bench", help="Enter 1RM for Bench Press", type=int)
 
+    parser.add_argument("-ohp", "--overhead-press", help="Enter 1RM for Overhead Press", type=int, dest="overhead_press")
+
     parser.add_argument("-dl", "--deadlift", help="Enter 1RM for Deadlift", type=int)
+
+    parser.add_argument("-zdl", "--zercher-deadlift", help="Enter 1RM for Zercher Deadlift", type=int, dest="zercher_deadlift")
+
+    parser.add_argument("-tbdl", "--trap-bar-deadlift", help="Enter 1RM for Trap Bar Deadlift", type=int, dest="trap_bar_deadlift")
 
     parser.add_argument(
         "-wpu",
