@@ -178,24 +178,24 @@ def build_program_markdown(
         # Legacy path — build from old fields for CLI flags.
         lifts: dict[str, dict] = {}
         if getattr(args, "squat", None) is not None:
-            lifts["squat"] = {"one_rm": args.squat, "body_weight": None}
+            lifts["squat"] = {"one_rm": round(args.squat), "body_weight": None}
         if getattr(args, "front_squat", None) is not None:
-            lifts["front squat"] = {"one_rm": args.front_squat, "body_weight": None}
+            lifts["front squat"] = {"one_rm": round(args.front_squat), "body_weight": None}
         if getattr(args, "zercher_squat", None) is not None:
-            lifts["zercher squat"] = {"one_rm": args.zercher_squat, "body_weight": None}
+            lifts["zercher squat"] = {"one_rm": round(args.zercher_squat), "body_weight": None}
         if getattr(args, "bench", None) is not None:
-            lifts["bench press"] = {"one_rm": args.bench, "body_weight": None}
+            lifts["bench press"] = {"one_rm": round(args.bench), "body_weight": None}
         if getattr(args, "overhead_press", None) is not None:
             lifts["overhead press"] = {
-                "one_rm": args.overhead_press,
+                "one_rm": round(args.overhead_press),
                 "body_weight": None,
             }
         if getattr(args, "deadlift", None) is not None:
-            lifts["deadlift"] = {"one_rm": args.deadlift, "body_weight": None}
+            lifts["deadlift"] = {"one_rm": round(args.deadlift), "body_weight": None}
         if getattr(args, "zercher_deadlift", None) is not None:
-            lifts["zercher deadlift"] = {"one_rm": args.zercher_deadlift, "body_weight": None}
+            lifts["zercher deadlift"] = {"one_rm": round(args.zercher_deadlift), "body_weight": None}
         if getattr(args, "trap_bar_deadlift", None) is not None:
-            lifts["trap bar deadlift"] = {"one_rm": args.trap_bar_deadlift, "body_weight": None}
+            lifts["trap bar deadlift"] = {"one_rm": round(args.trap_bar_deadlift), "body_weight": None}
         wpu = getattr(args, "weighted_pullup", None)
         if wpu is not None:
             one_rm, bw = wpu
@@ -261,8 +261,8 @@ def parse_one_rm_string(raw: str) -> int | None:
 
     Accepts:
       - '' or whitespace        -> None
-      - '455'                   -> 455 (assumed true 1RM)
-      - '240 5'                 -> estimate 1RM from 240 x 5
+      - '455' or '255.6'        -> 455 or 256 (rounded to nearest int)
+      - '240 5' or '240.5 5'    -> estimate 1RM from weight x reps (rounded)
       - '240x5', '240 x5',
         '240x 5', '240 x 5'     -> same as above
     """
@@ -270,8 +270,8 @@ def parse_one_rm_string(raw: str) -> int | None:
     if not raw:
         return None
 
-    # '240x5' / '240 x5' / '240x 5' / '240 x 5'
-    m = re.match(r"^(\d+)\s*[xX]\s*(\d+)$", raw)
+    # '240x5' / '240.5x5' / '240 x5' / '240x 5' / '240 x 5'
+    m = re.match(r"^(\d+(?:\.\d+)?)\s*[xX]\s*(\d+)$", raw)
     if m:
         weight = float(m.group(1))
         reps = int(m.group(2))
@@ -279,15 +279,21 @@ def parse_one_rm_string(raw: str) -> int | None:
 
     parts = raw.split()
 
-    # '240 5'
-    if len(parts) == 2 and all(p.isdigit() for p in parts):
-        weight = float(parts[0])
-        reps = int(parts[1])
-        return calculate_one_rm(weight, reps)
+    # '240 5' or '240.5 5'
+    if len(parts) == 2:
+        try:
+            weight = float(parts[0])
+            reps = int(parts[1])
+            return calculate_one_rm(weight, reps)
+        except ValueError:
+            return None
 
-    # Single integer '455' -> literal 1RM
-    if len(parts) == 1 and parts[0].isdigit():
-        return int(parts[0])
+    # Single number '455' or '255.6' -> literal 1RM (rounded)
+    if len(parts) == 1:
+        try:
+            return round(float(parts[0]))
+        except ValueError:
+            return None
 
     return None
 
@@ -300,17 +306,17 @@ def parse_weighted_pullup_string(bodyweight: int, raw: str) -> int | None:
 
     raw: one of:
       - '' or whitespace                -> returns None
-      - '35 4'                          -> +35 lb for 4 reps
+      - '35 4' or '35.5 4'              -> +35 or +35.5 lb for 4 reps
       - '35x4', '35 x4',
         '35x 4', '35 x 4'               -> +35 lb for 4 reps
       - '0 4'                           -> bodyweight-only for 4 reps
       - 'bw'                            -> bodyweight-only for 1 rep
       - 'bwx4', 'bw x4', 'bw x 4',
         'bw 4'                          -> bodyweight-only for 4 reps
-      - '45'                            -> +45 lb for 1 rep
+      - '45' or '45.5'                  -> +45 or +45.5 lb for 1 rep
 
     Returns:
-      - total 1RM (bodyweight + added) as an int
+      - total 1RM (bodyweight + added) as an int (rounded)
       - None if input is blank or invalid
     """
     raw = raw.strip()
@@ -319,7 +325,7 @@ def parse_weighted_pullup_string(bodyweight: int, raw: str) -> int | None:
 
     lower = raw.lower()
 
-    added: int
+    added: float
     reps: int
 
     # --- BW-only shorthands ---
@@ -335,23 +341,29 @@ def parse_weighted_pullup_string(bodyweight: int, raw: str) -> int | None:
         else:
             # --- Numeric styles ---
 
-            # '35x4', '35 x4', '35x 4', '35 x 4'
-            m = re.match(r"^(\d+)\s*[xX]\s*(\d+)$", raw)
+            # '35x4', '35.5x4', '35 x4', '35x 4', '35 x 4'
+            m = re.match(r"^(\d+(?:\.\d+)?)\s*[xX]\s*(\d+)$", raw)
             if m:
-                added = int(m.group(1))
+                added = float(m.group(1))
                 reps = int(m.group(2))
             else:
                 parts = raw.split()
 
-                # '35 4' style
-                if len(parts) == 2 and all(p.isdigit() for p in parts):
-                    added = int(parts[0])
-                    reps = int(parts[1])
+                # '35 4' or '35.5 4' style
+                if len(parts) == 2:
+                    try:
+                        added = float(parts[0])
+                        reps = int(parts[1])
+                    except ValueError:
+                        return None
 
-                # Single number '45' -> +45 lb for 1 rep
-                elif len(parts) == 1 and parts[0].isdigit():
-                    added = int(parts[0])
-                    reps = 1
+                # Single number '45' or '45.5' -> +45 lb for 1 rep
+                elif len(parts) == 1:
+                    try:
+                        added = float(parts[0])
+                        reps = 1
+                    except ValueError:
+                        return None
                 else:
                     return None
 
@@ -657,21 +669,21 @@ def main() -> None:
         const="all",
     )
 
-    parser.add_argument("-sq", "--squat", help="Enter 1RM for Squat", type=int)
+    parser.add_argument("-sq", "--squat", help="Enter 1RM for Squat (e.g. 455 or 455.5)", type=float)
 
-    parser.add_argument("-fsq", "--front-squat", help="Enter 1RM for Front Squat", type=int, dest="front_squat")
+    parser.add_argument("-fsq", "--front-squat", help="Enter 1RM for Front Squat (e.g. 355 or 355.5)", type=float, dest="front_squat")
 
-    parser.add_argument("-zsq", "--zercher-squat", help="Enter 1RM for Zercher Squat", type=int, dest="zercher_squat")
+    parser.add_argument("-zsq", "--zercher-squat", help="Enter 1RM for Zercher Squat (e.g. 315 or 315.5)", type=float, dest="zercher_squat")
 
-    parser.add_argument("-bp", "--bench", help="Enter 1RM for Bench Press", type=int)
+    parser.add_argument("-bp", "--bench", help="Enter 1RM for Bench Press (e.g. 250 or 250.5)", type=float)
 
-    parser.add_argument("-ohp", "--overhead-press", help="Enter 1RM for Overhead Press", type=int, dest="overhead_press")
+    parser.add_argument("-ohp", "--overhead-press", help="Enter 1RM for Overhead Press (e.g. 185 or 185.5)", type=float, dest="overhead_press")
 
-    parser.add_argument("-dl", "--deadlift", help="Enter 1RM for Deadlift", type=int)
+    parser.add_argument("-dl", "--deadlift", help="Enter 1RM for Deadlift (e.g. 500 or 500.5)", type=float)
 
-    parser.add_argument("-zdl", "--zercher-deadlift", help="Enter 1RM for Zercher Deadlift", type=int, dest="zercher_deadlift")
+    parser.add_argument("-zdl", "--zercher-deadlift", help="Enter 1RM for Zercher Deadlift (e.g. 405 or 405.5)", type=float, dest="zercher_deadlift")
 
-    parser.add_argument("-tbdl", "--trap-bar-deadlift", help="Enter 1RM for Trap Bar Deadlift", type=int, dest="trap_bar_deadlift")
+    parser.add_argument("-tbdl", "--trap-bar-deadlift", help="Enter 1RM for Trap Bar Deadlift (e.g. 550 or 550.5)", type=float, dest="trap_bar_deadlift")
 
     parser.add_argument(
         "-wpu",

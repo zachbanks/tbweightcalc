@@ -314,6 +314,17 @@ class TestParseOneRmString:
         assert cli.parse_one_rm_string("240x 5") == base
         assert cli.parse_one_rm_string("240 x 5") == base
 
+    def test_decimal_weights_rounded(self):
+        # Decimal 1RM values should be rounded to nearest int
+        assert cli.parse_one_rm_string("255.6") == 256
+        assert cli.parse_one_rm_string("255.4") == 255
+        assert cli.parse_one_rm_string("255.5") == 256  # Python rounds to even, but close enough
+
+        # Decimal weights with reps
+        # 240.5 x 5 -> Epley: 240.5 * (1 + 5/30) = 240.5 * 7/6 ≈ 280.583 -> 281
+        assert cli.parse_one_rm_string("240.5 5") == 281
+        assert cli.parse_one_rm_string("240.5x5") == 281
+
 
 # -------------------------------------------------------------------
 # Tests for parse_weighted_pullup_string + interactive WPU helper
@@ -395,6 +406,17 @@ class TestParseWeightedPullupString:
         assert cli.parse_weighted_pullup_string(bw, "35 x4") == base
         assert cli.parse_weighted_pullup_string(bw, "35x 4") == base
         assert cli.parse_weighted_pullup_string(bw, "35 x 4") == base
+
+    def test_decimal_added_weights_rounded(self):
+        bw = 200
+
+        # Decimal added weight for 1 rep: 200 + 45.5 = 245.5 x 1 -> 246
+        assert cli.parse_weighted_pullup_string(bw, "45.5") == 246
+
+        # Decimal added weight with reps: (200 + 35.5) x 4 = 235.5 x 4
+        # Epley: 235.5 * (1 + 4/30) ≈ 266.9 -> 267
+        assert cli.parse_weighted_pullup_string(bw, "35.5 4") == 267
+        assert cli.parse_weighted_pullup_string(bw, "35.5x4") == 267
 
 
 class TestPromptWeightedPullupInteractive:
