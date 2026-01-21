@@ -21,6 +21,19 @@ from tbweightcalc.program import markdown_to_pdf
 # -------------------------------------------------------------------
 # Which exercises are available for interactive mode, grouped into logical “slots”
 
+def format_exercise_name(exercise_name: str) -> str:
+    """
+    Format exercise name for display with proper capitalization.
+
+    Special cases:
+    - "rdl" -> "RDL"
+    - others -> Title Case
+    """
+    if exercise_name.lower() == "rdl":
+        return "RDL"
+    return exercise_name.title()
+
+
 INTERACTIVE_LIFT_SLOTS = [
     {
         "name": "Lower-body main lift",
@@ -75,6 +88,11 @@ INTERACTIVE_LIFT_SLOTS = [
                 "exercise_name": "trap bar deadlift",
                 "prompt": "Trap bar deadlift 1RM or set (e.g. '500' or '365 5' or '365x5', blank to skip): ",
             },
+            {
+                "key": "rdl",
+                "exercise_name": "rdl",
+                "prompt": "RDL 1RM or set (e.g. '365' or '275 5' or '275x5', blank to skip): ",
+            },
         ],
     },
     # Weighted pull-up is handled separately because of bodyweight.
@@ -97,7 +115,7 @@ def _prompt_for_exercise_1rm(exercise_name: str) -> tuple[int | None, float]:
                 bar_weight = prompt_bar_weight(exercise_name)
                 return (one_rm, bar_weight)
     # If not found in config, just fall back to a generic prompt.
-    generic = f"{exercise_name.title()} 1RM or set (e.g. '225', '200 5', '200x5', blank to skip): "
+    generic = f"{format_exercise_name(exercise_name)} 1RM or set (e.g. '225', '200 5', '200x5', blank to skip): "
     one_rm = prompt_lift_one_rm(generic)
     if one_rm is None:
         return (None, 45.0)
@@ -589,7 +607,7 @@ def run_interactive() -> None:
 
             print(f"\n{name}:")
             for idx, opt in enumerate(options, start=1):
-                print(f"  [{idx}] {opt['exercise_name'].title()}")
+                print(f"  [{idx}] {format_exercise_name(opt['exercise_name'])}")
             print("  [s] Skip this slot")
 
             while True:
@@ -665,7 +683,7 @@ def run_interactive() -> None:
             while True:
                 print("\nAvailable exercises:")
                 for idx, ex_name in enumerate(available, start=1):
-                    print(f"  [{idx}] {ex_name.title()}")
+                    print(f"  [{idx}] {format_exercise_name(ex_name)}")
 
                 while True:
                     choice = input("Select exercise number: ").strip()
@@ -681,11 +699,6 @@ def run_interactive() -> None:
 
                     ex_name = available[idx - 1]
 
-                    # Skip if already in program
-                    if ex_name in lifts:
-                        print(f"{ex_name.title()} is already in your program. Choose a different exercise.")
-                        continue
-
                     # Special handling for weighted pull-ups
                     if ex_name == "weighted pullup":
                         wpu_1rm, bodyweight = prompt_weighted_pullup_interactive()
@@ -693,7 +706,7 @@ def run_interactive() -> None:
                             print("No valid weighted pull-up data entered; skipping this exercise.")
                             break
                         lifts[ex_name] = {"one_rm": wpu_1rm, "body_weight": bodyweight, "bar_weight": 45.0}
-                        print(f"Added {ex_name.title()} to your program.")
+                        print(f"Added {format_exercise_name(ex_name)} to your program.")
                         break
 
                     # Regular exercises (barbell lifts)
@@ -703,7 +716,7 @@ def run_interactive() -> None:
                         break
 
                     lifts[ex_name] = {"one_rm": one_rm, "body_weight": None, "bar_weight": bar_weight}
-                    print(f"Added {ex_name.title()} to your program.")
+                    print(f"Added {format_exercise_name(ex_name)} to your program.")
                     break
 
                 # Ask if they want to add another

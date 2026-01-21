@@ -9,6 +9,47 @@ from tbweightcalc import cli
 
 
 # -------------------------------------------------------------------
+# Tests for format_exercise_name
+# -------------------------------------------------------------------
+
+
+def test_format_exercise_name_rdl():
+    """Test that RDL is capitalized properly."""
+    assert cli.format_exercise_name("rdl") == "RDL"
+    assert cli.format_exercise_name("RDL") == "RDL"
+    assert cli.format_exercise_name("Rdl") == "RDL"
+
+
+def test_format_exercise_name_regular():
+    """Test that regular exercises use title case."""
+    assert cli.format_exercise_name("squat") == "Squat"
+    assert cli.format_exercise_name("bench press") == "Bench Press"
+    assert cli.format_exercise_name("front squat") == "Front Squat"
+
+
+def test_rdl_in_hinge_slot():
+    """Test that RDL is available in the Hinge slot."""
+    hinge_slot = None
+    for slot in cli.INTERACTIVE_LIFT_SLOTS:
+        if slot["name"] == "Hinge":
+            hinge_slot = slot
+            break
+
+    assert hinge_slot is not None, "Hinge slot should exist"
+
+    # Check that RDL is in the options
+    rdl_option = None
+    for opt in hinge_slot["options"]:
+        if opt["exercise_name"] == "rdl":
+            rdl_option = opt
+            break
+
+    assert rdl_option is not None, "RDL should be in Hinge options"
+    assert rdl_option["key"] == "rdl"
+    assert "RDL" in rdl_option["prompt"], "Prompt should use capitalized RDL"
+
+
+# -------------------------------------------------------------------
 # Small helper for build_program_markdown tests
 # -------------------------------------------------------------------
 
