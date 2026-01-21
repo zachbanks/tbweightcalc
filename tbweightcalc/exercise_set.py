@@ -182,126 +182,240 @@ class ExerciseSet:
         return int(5 * round(weight / 5))
 
 
-def optimize_warmup_weight(
+def get_plate_list(
     total_weight: float,
-    *,
     bar_weight: float = 45.0,
     available_plates: Iterable[float] | None = None,
-    threshold: float = 2.5,
-) -> float:
+) -> List[float]:
     """
-    For warm-up sets ONLY:
-      If the per-side plate total is within `threshold` lb of a single plate,
-      round UP to that plate to reduce number of plates.
+    Calculate the list of plates needed per side for a given total weight.
+
+    Returns a sorted list (largest to smallest) of plates on one side of the bar.
 
     Example:
-      total_weight = 90  (45 bar + 22.5/side)
-      per_side = (90 - 45) / 2 = 22.5
-      available_plates = [45, 35, 25, 15, 10, 5, 2.5]
-
-      next plate >= 22.5 is 25
-      25 - 22.5 = 2.5 <= threshold -> optimized total = 45 + 25*2 = 95
+        total_weight = 185, bar_weight = 45
+        per_side = (185 - 45) / 2 = 70
+        plates needed: [45, 25] (one 45 and one 25 per side)
     """
-    # Nothing to optimize if we're at or below bar weight
     if total_weight <= bar_weight:
-        return total_weight
+        return []
 
     if available_plates is None:
         available_plates = [45, 35, 25, 15, 10, 5, 2.5]
 
-    plates_sorted = sorted(available_plates)
-
+    plates_sorted = sorted(available_plates, reverse=True)
     per_side = (total_weight - bar_weight) / 2.0
-    if per_side <= 0:
-        return total_weight
 
-    candidate: float | None = None
+    plates_on_bar: List[float] = []
+    remaining = per_side
 
-    for p in plates_sorted:
-        if p >= per_side:
-            # First plate that is >= current per-side load
-            if p - per_side <= threshold:
-                candidate = p
-            break
+    for plate in plates_sorted:
+        while remaining >= plate:
+            plates_on_bar.append(plate)
+            remaining -= plate
 
-    if candidate is None:
-        return total_weight
-
-    optimized_total = bar_weight + candidate * 2.0
-    return optimized_total
+    return plates_on_bar
 
 
-def optimize_warmup_weight(
-    total_weight: float,
-    *,
-    bar_weight: float = 45.0,
-    available_plates: Iterable[float] | None = None,
-    threshold: float = 2.5,
-) -> float:
+def plates_are_subset(warmup_plates: List[float], next_plates: List[float]) -> bool:
     """
-    For warm-up sets ONLY:
-      If the *small plates* on each side are within `threshold` lb of the next
-      single plate, round that remainder UP to reduce plate clutter.
+    Check if warmup_plates is a subset of next_plates (can progress by only adding plates).
 
-    Logic (per side):
-      per_side = (total - bar) / 2
-
-      base_plate = largest plate <= per_side  (e.g. 45)
-      remainder  = per_side - base_plate      (e.g. 22.5 from 15+5+2.5)
-
-      If there is a plate `p` such that:
-        p >= remainder and (p - remainder) <= threshold,
-      then:
-        new_per_side = base_plate + p
-        new_total = bar + 2 * new_per_side
+    Returns True if you can get from warmup_plates to next_plates by only adding plates,
+    False if you'd need to remove any plates.
 
     Example:
-      total = 180  (45 bar + (45+15+5+2.5) per side)
-      per_side = (180 - 45) / 2 = 67.5
-      base_plate = 45
-      remainder = 22.5
-      next plate >= 22.5 is 25
-      25 - 22.5 = 2.5 <= threshold
+        warmup_plates = [45, 25]  (185 lbs total)
+        next_plates = [45, 35, 2.5]  (210 lbs total)
+        Returns False because you'd need to remove the 25 to add 35+2.5
 
-      -> per_side -> 45 + 25 = 70
-      -> total -> 45 + 2 * 70 = 185
+        warmup_plates = [45, 15]  (165 lbs total)
+        next_plates = [45, 15, 5]  (175 lbs total)
+        Returns True because you just add a 5 lb plate
     """
-    # Nothing to optimize if we're at or below bar weight
-    if total_weight <= bar_weight:
-        return total_weight
+    warmup_count = {}
+    for plate in warmup_plates:
+        warmup_count[plate] = warmup_count.get(plate, 0) + 1
+
+    next_count = {}
+    for plate in next_plates:
+        next_count[plate] = next_count.get(plate, 0) + 1
+
+    # Check if all warmup plates are present in the next set
+    for plate, count in warmup_count.items():
+        if next_count.get(plate, 0) < count:
+            return False
+
+    return True
+
+
+def round_up_to_valid_progression(
+    current_weight: float,
+    next_weight: float,
+    bar_weight: float = 45.0,
+    available_plates: Iterable[float] | None = None,
+    max_increase: float = 30.0,
+) -> float:
+    """
+    Round up current_weight to ensure a valid linear progression to next_weight.
+
+    A valid progression means you can move from current to next by only ADDING plates,
+    never removing them. If current weight requires removing plates to reach next,
+    round current up to a weight that allows adding plates only.
+
+    Strategy:
+        - Find all possible plate combinations that are subsets of the next weight's plates
+        - Choose the combination closest to current_weight (but >= current_weight)
+        - Only adjust if within max_increase
+
+    Args:
+        current_weight: The current warmup weight
+        next_weight: The next set's weight (either another warmup or working weight)
+        bar_weight: Weight of the barbell
+        available_plates: List of available plate weights
+        max_increase: Maximum amount to increase current weight to fix progression (lbs)
+
+    Returns:
+        Adjusted current_weight that allows linear progression
+    """
+    if available_plates is None:
+        available_plates = [45, 35, 25, 15, 10, 5, 2.5]
+
+    # Get plates for current and next weights
+    current_plates = get_plate_list(current_weight, bar_weight, available_plates)
+    next_plates = get_plate_list(next_weight, bar_weight, available_plates)
+
+    # If already a valid progression, return as-is
+    if plates_are_subset(current_plates, next_plates):
+        return current_weight
+
+    # Generate all valid subsets of next_plates and find the best one
+    # A valid subset is one that:
+    # 1. Is a proper subset of next_plates (fewer or equal plates)
+    # 2. Results in a weight >= current_weight
+    # 3. Results in a weight < next_weight
+    # 4. Is within max_increase of current_weight
+
+    # Strategy: Build plate combinations from next_plates, starting with larger subsets
+    # and working down, to find one closest to current_weight
+
+    from itertools import combinations
+
+    next_plate_count = {}
+    for plate in next_plates:
+        next_plate_count[plate] = next_plate_count.get(plate, 0) + 1
+
+    # Create a list of (plate, count) for easier manipulation
+    plate_items = list(next_plate_count.items())
+
+    best_weight = None
+    best_diff = float('inf')
+
+    # Try all possible combinations of plates that are subsets of next_plates
+    # We'll iterate through possible subset configurations
+    def generate_subsets(plate_items):
+        """Generate all valid subsets of plate combinations."""
+        if not plate_items:
+            yield []
+            return
+
+        plate, max_count = plate_items[0]
+        rest = plate_items[1:]
+
+        # For this plate, try using 0 to max_count of them
+        for count in range(max_count + 1):
+            for rest_subset in generate_subsets(rest):
+                yield [(plate, count)] + rest_subset if count > 0 else rest_subset
+
+    for subset_config in generate_subsets(plate_items):
+        # Calculate the weight for this subset
+        subset_plates = []
+        for plate, count in subset_config:
+            subset_plates.extend([plate] * count)
+
+        test_weight = bar_weight + 2.0 * sum(subset_plates)
+
+        # Check if this is a valid candidate
+        if (test_weight >= current_weight and
+            test_weight < next_weight and
+            test_weight <= current_weight + max_increase):
+
+            diff = test_weight - current_weight
+            if diff < best_diff:
+                best_diff = diff
+                best_weight = test_weight
+
+    # Return the best weight found, or original if none found
+    return best_weight if best_weight is not None else current_weight
+
+
+def ensure_linear_warmup_progression(
+    warmup_weights: List[float],
+    working_weight: float,
+    bar_weight: float = 45.0,
+    available_plates: Iterable[float] | None = None,
+    max_increase_per_warmup: float = 30.0,
+) -> List[float]:
+    """
+    Ensure all warmup weights form a linear progression to working weight.
+
+    Works backwards from the working weight to ensure each warmup can progress
+    to the next by only adding plates, never removing them.
+
+    Args:
+        warmup_weights: List of warmup weights in order (lightest to heaviest)
+        working_weight: The final working set weight
+        bar_weight: Weight of the barbell
+        available_plates: List of available plate weights
+        max_increase_per_warmup: Max amount to increase any single warmup weight
+
+    Returns:
+        Adjusted list of warmup weights ensuring linear progression
+    """
+    if not warmup_weights:
+        return []
 
     if available_plates is None:
         available_plates = [45, 35, 25, 15, 10, 5, 2.5]
 
-    plates_sorted = sorted(available_plates)
+    # Work backwards from working weight
+    adjusted_weights = warmup_weights.copy()
 
-    per_side = (total_weight - bar_weight) / 2.0
-    if per_side <= 0:
-        return total_weight
+    # Start from the last warmup and work backwards
+    # Each weight must be a valid progression to the next weight
+    all_weights = adjusted_weights + [working_weight]
 
-    # 1) Choose the "big" base plate that we always keep on the bar.
-    #    If no plate <= per_side, base_plate is 0 (only small stuff).
-    non_bigger = [p for p in plates_sorted if p <= per_side]
-    base_plate = max(non_bigger) if non_bigger else 0.0
+    # Process backwards: for each warmup, ensure it can progress to next
+    for i in range(len(all_weights) - 2, -1, -1):
+        current = all_weights[i]
+        next_weight = all_weights[i + 1]
 
-    remainder = per_side - base_plate
-    if remainder <= 0:
-        return total_weight
+        # Check if current can progress linearly to next
+        current_plates = get_plate_list(current, bar_weight, available_plates)
+        next_plates = get_plate_list(next_weight, bar_weight, available_plates)
 
-    # 2) Find a single plate that can replace the remainder
-    candidate: float | None = None
-    for p in plates_sorted:
-        if p >= remainder:
-            if p - remainder <= threshold:
-                candidate = p
-            break
+        if not plates_are_subset(current_plates, next_plates):
+            # Need to adjust current weight
+            adjusted = round_up_to_valid_progression(
+                current,
+                next_weight,
+                bar_weight,
+                available_plates,
+                max_increase=max_increase_per_warmup,
+            )
 
-    if candidate is None:
-        return total_weight
+            # If we couldn't find a valid adjustment (returned original weight),
+            # try using bar-only weight as a fallback
+            if adjusted == current:
+                # Check if bar-only is a valid progression to next
+                bar_only_plates = get_plate_list(bar_weight, bar_weight, available_plates)
+                if plates_are_subset(bar_only_plates, next_plates):
+                    adjusted = bar_weight
 
-    new_per_side = base_plate + candidate
-    optimized_total = bar_weight + 2.0 * new_per_side
-    return optimized_total
+            all_weights[i] = adjusted
+
+    # Return just the warmup weights (exclude working weight)
+    return all_weights[:-1]
 
 
 def optimize_warmup_weight(
@@ -316,45 +430,21 @@ def optimize_warmup_weight(
 ) -> float:
     """
     For warm-up sets ONLY:
-      Try to reduce plate clutter on each side by rounding the *small plates*
-      up to a single plate if the difference is within `threshold`.
+      1. Round small plates up to reduce clutter (within threshold)
+      2. If next set uses a big plate we're close to, pre-load it
+      3. Ensure linear progression (only adding plates, never removing)
 
-    Additionally, if the *next* set will require a "big" plate (>=
-    ``big_plate_min``) and the current per-side load is reasonably close to
-    that plate (within ``big_plate_slack``), round UP to that big plate so the
-    bar is pre-loaded for the upcoming set.
-
-    Per-side logic:
-      per_side = (total - bar) / 2
-
-      base_total = sum of as many largest plates (e.g. 45s) as possible
-      remainder  = per_side - base_total    (represents small plates)
-
-      If there exists a plate p such that:
-        p >= remainder and (p - remainder) <= threshold
-      then:
-        new_per_side = base_total + p
-        new_total = bar + 2 * new_per_side
+    The linear progression check ensures that you can move from this warmup
+    to the next set by only adding plates, never removing them.
 
     Examples:
-      1) 180 lb total:
-         per_side = (180 - 45) / 2 = 67.5
-         largest plate = 45
+      1) Current: 185 (45+25 per side), Next: 210 (45+35+2.5)
+         Problem: Must remove 25 to add 35+2.5
+         Solution: Round 185 up to 190 (45+35 +2.5) so you just add 35 plate
 
-         base_total: 67.5 - 45 = 22.5 → base_total=45, remainder=22.5
-         next plate >= 22.5 is 25 (gap = 2.5 <= threshold)
-
-         → per_side -> 45 + 25 = 70
-         → total -> 45 + 2*70 = 185 (i.e., (45 x 2) 25)
-
-      2) 290 lb total:
-         per_side = (290 - 45) / 2 = 122.5
-         base_total: 122.5 - 45 = 77.5, 77.5 - 45 = 32.5
-                     → base_total = 90, remainder = 32.5
-         next plate >= 32.5 is 35 (gap = 2.5)
-
-         → per_side -> 90 + 35 = 125
-         → total -> 45 + 2*125 = 295 (i.e., (45 x 2) 35)
+      2) Current: 165 (45+15 per side), Next: 175 (45+15+5)
+         Valid: Just add 5 lb plate
+         No adjustment needed
     """
     # Nothing to optimize if we're at or below bar weight
     if total_weight <= bar_weight:
@@ -364,13 +454,11 @@ def optimize_warmup_weight(
         available_plates = [45, 35, 25, 15, 10, 5, 2.5]
 
     plates_sorted = sorted(available_plates)
-
     per_side = (total_weight - bar_weight) / 2.0
     if per_side <= 0:
         return total_weight
 
-    # Prefer pre-loading a big plate if the next set will use one soon and
-    # we're close enough to justify the jump.
+    # PHASE 1: Pre-load big plate if next set needs it and we're close
     if next_total_weight and next_total_weight > bar_weight:
         next_per_side = (next_total_weight - bar_weight) / 2.0
         big_candidates = [
@@ -381,31 +469,57 @@ def optimize_warmup_weight(
         if next_big_plate and per_side < next_big_plate:
             gap = next_big_plate - per_side
             if gap <= big_plate_slack:
-                return bar_weight + 2.0 * next_big_plate
+                preload_weight = bar_weight + 2.0 * next_big_plate
+                # Still check linear progression for safety
+                if next_total_weight:
+                    return round_up_to_valid_progression(
+                        preload_weight,
+                        next_total_weight,
+                        bar_weight,
+                        available_plates,
+                        max_increase=0,  # Already made our adjustment
+                    )
+                return preload_weight
 
-    # 1) Peel off as many largest plates as possible (base stack of 45s, 35s, etc.)
+    # PHASE 2: Optimize small plates (reduce clutter)
+    # Peel off as many largest plates as possible
     largest = max(plates_sorted)
     base_total = 0.0
+    remaining_per_side = per_side
 
-    while per_side - largest >= 0:
+    while remaining_per_side >= largest:
         base_total += largest
-        per_side -= largest
+        remaining_per_side -= largest
 
-    remainder = per_side
-    if remainder <= 0:
-        return total_weight
+    remainder = remaining_per_side
 
-    # 2) Try to replace the remainder with a single plate
-    candidate: float | None = None
-    for p in plates_sorted:
-        if p >= remainder:
-            if p - remainder <= threshold:
-                candidate = p
-            break
+    # Try to replace remainder with a single plate
+    optimized_weight = total_weight
+    if remainder > 0:
+        candidate: float | None = None
+        for p in plates_sorted:
+            if p >= remainder:
+                if p - remainder <= threshold:
+                    candidate = p
+                break
 
-    if candidate is None:
-        return total_weight
+        if candidate is not None:
+            new_per_side = base_total + candidate
+            optimized_weight = bar_weight + 2.0 * new_per_side
 
-    new_per_side = base_total + candidate
-    optimized_total = bar_weight + 2.0 * new_per_side
-    return optimized_total
+    # PHASE 3: Ensure linear progression to next set
+    # Always check if we need to adjust for linear progression, regardless of whether
+    # we optimized in phase 2
+    if next_total_weight and next_total_weight > optimized_weight:
+        adjusted = round_up_to_valid_progression(
+            optimized_weight,
+            next_total_weight,
+            bar_weight,
+            available_plates,
+            max_increase=20.0,  # Allow up to 20 lbs increase to fix progression
+        )
+        # Only use the adjusted weight if it actually improved the progression
+        if adjusted != optimized_weight:
+            optimized_weight = adjusted
+
+    return optimized_weight

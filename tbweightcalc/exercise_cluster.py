@@ -1,4 +1,4 @@
-from .exercise_set import ExerciseSet, optimize_warmup_weight
+from .exercise_set import ExerciseSet, optimize_warmup_weight, ensure_linear_warmup_progression
 from .formatting import Formatter, PlainFormatter
 
 # ---------------------------------------------------------------------------
@@ -348,6 +348,7 @@ class ExerciseCluster:
 
         # Second pass: apply warmup optimization with lookahead
         if profile["kind"] == "barbell":
+            # First, apply individual warmup optimizations (reduce plate clutter)
             for idx, (d, s) in enumerate(zip(setdefs, built_sets)):
                 if d.get("multiplier", 1.0) < 1.0:
                     next_weight = None
@@ -361,6 +362,37 @@ class ExerciseCluster:
                         threshold=2.5,
                         next_total_weight=next_weight,
                     )
+
+            # Second, ensure linear progression (work backwards to fix any issues)
+            warmup_weights = []
+            warmup_indices = []
+            working_weight = None
+
+            for idx, (d, s) in enumerate(zip(setdefs, built_sets)):
+                if d.get("multiplier", 1.0) < 1.0:
+                    warmup_weights.append(s.weight)
+                    warmup_indices.append(idx)
+                else:
+                    # This is the working set
+                    working_weight = s.weight
+                    break  # Only care about first working set for warmup progression
+
+            if warmup_weights and working_weight:
+                # Allow up to 25% increase per warmup to ensure linear progression
+                # For heavy lifts, this might mean significant jumps
+                max_pct_increase = 0.25
+                max_increase = max(30.0, working_weight * max_pct_increase)
+
+                adjusted_warmups = ensure_linear_warmup_progression(
+                    warmup_weights,
+                    working_weight,
+                    bar_weight=self.bar_weight,
+                    max_increase_per_warmup=max_increase,
+                )
+
+                # Apply the adjusted weights back to the sets
+                for idx, adjusted_weight in zip(warmup_indices, adjusted_warmups):
+                    built_sets[idx].weight = adjusted_weight
 
         # Save sets
         self.sets = built_sets
