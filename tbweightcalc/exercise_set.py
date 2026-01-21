@@ -468,9 +468,61 @@ def ensure_linear_warmup_progression(
                     if plates_are_subset(bar_only_plates, next_plates):
                         adjusted = bar_weight
 
-                # CRITICAL: Ensure monotonically increasing - adjusted weight must be >= previous
-                # If rounding down would create a decrease, we have a few options:
-                if adjusted < prev_weight:
+                # Check if adjusted forms a valid linear progression to next
+                adjusted_plates = get_plate_list(adjusted, bar_weight, available_plates)
+                next_plates_check = get_plate_list(next_weight, bar_weight, available_plates)
+                is_valid_progression = plates_are_subset(adjusted_plates, next_plates_check)
+
+                # CRITICAL: Ensure monotonically STRICTLY increasing (except first warmup)
+                # Only the first warmup can be bar-only. All subsequent warmups must be heavier.
+                # Also ensure the adjusted weight forms a valid linear progression to next.
+                if i > 0 and (adjusted <= prev_weight or not is_valid_progression):
+                    # For non-first warmups, we need:
+                    # 1. adjusted > prev_weight (strictly increasing)
+                    # 2. adjusted plates ⊆ next_weight plates (linear progression)
+
+                    # Try to find a valid weight that's between prev_weight and next_weight
+                    # AND forms a valid linear progression to next_weight
+
+                    # Get all valid subsets of next_plates
+                    next_plates_list = get_plate_list(next_weight, bar_weight, available_plates)
+                    next_plate_count = {}
+                    for plate in next_plates_list:
+                        next_plate_count[plate] = next_plate_count.get(plate, 0) + 1
+
+                    plate_items = list(next_plate_count.items())
+
+                    def generate_subsets(items):
+                        if not items:
+                            yield []
+                            return
+                        plate, max_count = items[0]
+                        rest = items[1:]
+                        for count in range(max_count + 1):
+                            for rest_subset in generate_subsets(rest):
+                                yield [(plate, count)] + rest_subset if count > 0 else rest_subset
+
+                    # Find the smallest valid weight that's > prev_weight and < next_weight
+                    best_candidate = None
+                    for subset_config in generate_subsets(plate_items):
+                        subset_plates = []
+                        for plate, count in subset_config:
+                            subset_plates.extend([plate] * count)
+                        test_weight = bar_weight + 2.0 * sum(subset_plates)
+
+                        if test_weight > prev_weight and test_weight < next_weight:
+                            if best_candidate is None or test_weight < best_candidate:
+                                best_candidate = test_weight
+
+                    if best_candidate:
+                        adjusted = best_candidate
+                    else:
+                        # No valid weight between prev and next - keep original
+                        # This will create a non-linearity, but that's better than duplicates
+                        adjusted = current
+
+                # Handle the case where adjusted < prev_weight (backward progression)
+                elif adjusted < prev_weight:
                     # Try using prev_weight if it forms a valid progression to next
                     prev_plates = get_plate_list(prev_weight, bar_weight, available_plates)
                     if plates_are_subset(prev_plates, next_plates):
