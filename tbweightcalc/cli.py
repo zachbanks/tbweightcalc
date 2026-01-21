@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Optional
 
 import tbweightcalc as tb
+from tbweightcalc.config import Config, load_config
 from tbweightcalc.formatting import Formatter, MarkdownFormatter, PlainFormatter
 from tbweightcalc.onerm import calculate_one_rm
 from tbweightcalc.program import markdown_to_pdf
@@ -166,6 +167,7 @@ def build_program_markdown(
     args: argparse.Namespace,
     for_pdf: bool = False,
     formatter: Formatter | None = None,
+    config: Config | None = None,
 ) -> str:
     """
     Build the Tactical Barbell program markdown.
@@ -177,9 +179,16 @@ def build_program_markdown(
     - Otherwise, we fall back to the legacy fixed fields:
         args.squat, args.bench, args.deadlift, args.weighted_pullup, etc.
     """
+    # Load config if not provided
+    if config is None:
+        config = load_config()
+
     fmt = formatter
     if fmt is None:
-        fmt = MarkdownFormatter() if for_pdf else PlainFormatter()
+        if for_pdf:
+            fmt = MarkdownFormatter(formatting_config=config.formatting)
+        else:
+            fmt = PlainFormatter(formatting_config=config.formatting)
 
     lines: list[str] = []
 
@@ -822,6 +831,12 @@ def main() -> None:
         help="Optional explicit path for the PDF output; defaults to ~/Downloads/<title>.pdf",
     )
 
+    parser.add_argument(
+        "--config",
+        help="Path to custom config YAML file (defaults to ~/.config/tbcalc/config.yaml)",
+        type=Path,
+    )
+
     # No arguments at all -> full interactive program mode
     if len(sys.argv) == 1:
         try:
@@ -832,6 +847,9 @@ def main() -> None:
         return
 
     args = parser.parse_args()
+
+    # Load config
+    config = load_config(args.config if hasattr(args, 'config') and args.config else None)
 
     # If 1RM calculator flag is used, handle it first and exit
     if args.onerm is not None:
@@ -857,12 +875,12 @@ def main() -> None:
     else:
         title = f"Tactical Barbell Max Strength: {datetime.date.today():%Y-%m-%d}"
 
-    screen_formatter = PlainFormatter()
-    pdf_formatter = MarkdownFormatter()
+    screen_formatter = PlainFormatter(formatting_config=config.formatting)
+    pdf_formatter = MarkdownFormatter(formatting_config=config.formatting)
 
     # 1) Build plain text for screen (with visible ---)
     screen_body = build_program_markdown(
-        args, for_pdf=False, formatter=screen_formatter
+        args, for_pdf=False, formatter=screen_formatter, config=config
     )
     screen_output = f"{screen_formatter.heading(title, level=1)}\n\n{screen_body}"
 
@@ -870,10 +888,11 @@ def main() -> None:
     print(screen_output)
 
     # 2) Copy to clipboard (best-effort; works when run on macOS host)
-    copy_to_clipboard(screen_output)
+    if config.output.copy_to_clipboard:
+        copy_to_clipboard(screen_output)
 
     # 3) Build markdown for PDF (with page breaks, no visible hr)
-    pdf_body = build_program_markdown(args, for_pdf=True, formatter=pdf_formatter)
+    pdf_body = build_program_markdown(args, for_pdf=True, formatter=pdf_formatter, config=config)
 
     # Determine PDF path:
     #   - If user passed --pdf, honor that

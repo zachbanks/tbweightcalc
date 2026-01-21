@@ -3,6 +3,10 @@ from __future__ import annotations
 """Helpers for rendering program output in plain text or Markdown."""
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .config import FormattingConfig
 
 
 # Central registry of Markdown styles
@@ -73,12 +77,17 @@ class Formatter:
     def horizontal_rule(self) -> str:
         raise NotImplementedError
 
+    def format_weight(self, weight: float) -> str:
+        """Format a weight value. Can be overridden by subclasses."""
+        raise NotImplementedError
+
 
 @dataclass(slots=True)
 class PlainFormatter(Formatter):
     """Formatter that emits plain text (no Markdown syntax)."""
 
     bullet: str = "• "
+    formatting_config: "FormattingConfig | None" = None
 
     def heading(self, text: str, *, level: int = 1) -> str:  # noqa: ARG002
         return text
@@ -95,12 +104,20 @@ class PlainFormatter(Formatter):
     def horizontal_rule(self) -> str:
         return "-" * 10
 
+    def format_weight(self, weight: float) -> str:
+        """Format a weight value according to config."""
+        if self.formatting_config:
+            return self.formatting_config.format_weight(weight)
+        # Default fallback
+        return f"{int(weight) if weight == int(weight) else weight} lbs"
+
 
 @dataclass(slots=True)
 class MarkdownFormatter(Formatter):
     """Formatter that emits Markdown-friendly text."""
 
     styles: dict = None
+    formatting_config: "FormattingConfig | None" = None
 
     def __post_init__(self):
         if self.styles is None:
@@ -121,3 +138,10 @@ class MarkdownFormatter(Formatter):
 
     def horizontal_rule(self) -> str:
         return apply_markdown("", "hr", styles=self.styles)
+
+    def format_weight(self, weight: float) -> str:
+        """Format a weight value according to config."""
+        if self.formatting_config:
+            return self.formatting_config.format_weight(weight)
+        # Default fallback
+        return f"{int(weight) if weight == int(weight) else weight} lbs"

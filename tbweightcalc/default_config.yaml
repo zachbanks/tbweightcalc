@@ -1,0 +1,62 @@
+# Tactical Barbell Weight Calculator - Default Configuration
+#
+# This file contains default settings for tbcalc. You can override these by creating
+# a config file at ~/.config/tbcalc/config.yaml or by specifying a custom path with
+# the --config flag.
+
+# Formatting preferences
+formatting:
+  # Weight unit format: Choose how weights are displayed
+  # Options: "pounds_sign" (#), "lbs" (lbs), "pounds" (pounds)
+  weight_unit: "lbs"
+
+  # Show decimal places for weights
+  # If false, weights like 135.0 display as "135"
+  # If true, weights display with decimal precision
+  show_weight_decimals: false
+
+  # Bar weight indicator text (used in exercise titles with custom bars)
+  # Example: "SQUAT (35# bar)" or "SQUAT (35 lbs bar)"
+  bar_indicator: "bar"
+
+# Default bar weights
+defaults:
+  # Standard barbell weight in pounds
+  standard_bar_weight: 45.0
+
+  # Default body weight for weighted pull-ups (can be overridden interactively)
+  body_weight: null
+
+# Week percentages for the 6-week program
+week_percentages:
+  1: 70  # Week 1: 70% of 1RM
+  2: 80  # Week 2: 80% of 1RM
+  3: 90  # Week 3: 90% of 1RM
+  4: 75  # Week 4: 75% of 1RM (deload)
+  5: 85  # Week 5: 85% of 1RM
+  6: 95  # Week 6: 95% of 1RM
+
+# Output preferences
+output:
+  # Default output directory for PDFs
+  pdf_output_dir: "~/Downloads"
+
+  # Default title format (use {date} placeholder for current date)
+  default_title: "Tactical Barbell Max Strength: {date}"
+
+  # Date format for titles (Python strftime format)
+  date_format: "%Y-%m-%d"
+
+  # Copy output to clipboard (macOS only, requires pbcopy)
+  copy_to_clipboard: true
+
+# Available plate weights (in pounds) for plate breakdown calculations
+# Listed from heaviest to lightest
+available_plates:
+  - 45
+  - 35
+  - 25
+  - 15
+  - 10
+  - 5
+  - 2.5

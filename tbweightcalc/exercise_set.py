@@ -1,4 +1,7 @@
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .formatting import Formatter
 
 
 class ExerciseSet:
@@ -12,6 +15,7 @@ class ExerciseSet:
         bar=True,
         bar_weight=45,
         plate_breakdown_on=True,
+        formatter: "Formatter | None" = None,
     ):
         self.min_set = min_set
         self.max_set = max_set
@@ -23,6 +27,7 @@ class ExerciseSet:
             weight  # Bar and bar weight must be before weight method is called.
         )
         self.plate_breakdown_on = plate_breakdown_on
+        self.formatter = formatter
 
     def describe(self) -> dict:
         """Return a formatting-neutral representation of the set."""
@@ -52,7 +57,11 @@ class ExerciseSet:
             weight_label = self.plate_breakdown
             breakdown = None
         else:
-            weight_label = "%d lbs" % (self.weight)
+            # Use formatter if available, otherwise fallback to default "lbs" format
+            if self.formatter and hasattr(self.formatter, 'format_weight'):
+                weight_label = self.formatter.format_weight(self.weight)
+            else:
+                weight_label = "%d lbs" % (self.weight)
             breakdown = self.plate_breakdown if self.plate_breakdown_on else None
 
         return {

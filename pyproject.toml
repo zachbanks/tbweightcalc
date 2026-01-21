@@ -12,6 +12,7 @@ authors = [
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "pyyaml>=6.0",
 ]
 
 [project.scripts]
@@ -19,3 +20,6 @@ tbcalc = "tbweightcalc.cli:main"
 
 [tool.setuptools]
 packages = ["tbweightcalc"]
+
+[tool.setuptools.package-data]
+tbweightcalc = ["default_config.yaml"]

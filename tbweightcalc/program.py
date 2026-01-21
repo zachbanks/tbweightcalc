@@ -106,9 +106,16 @@ class Program:
 
         # Header with optional bar weight for custom bars
         if bar_weight != 45.0:
-            # Display bar weight as integer if it's a whole number, otherwise as decimal
-            bar_display = int(bar_weight) if bar_weight == int(bar_weight) else bar_weight
-            output_lines.append(fmt.heading(f"{exercise.upper()} ({bar_display}# bar)", level=3))
+            # Use formatter to format the bar weight
+            if hasattr(fmt, 'format_weight'):
+                bar_display = fmt.format_weight(bar_weight)
+                # Extract just the number and unit, strip extra formatting
+                bar_indicator = fmt.formatting_config.bar_indicator if (fmt.formatting_config and hasattr(fmt.formatting_config, 'bar_indicator')) else "bar"
+                output_lines.append(fmt.heading(f"{exercise.upper()} ({bar_display} {bar_indicator})", level=3))
+            else:
+                # Fallback for formatters without format_weight
+                bar_display = int(bar_weight) if bar_weight == int(bar_weight) else bar_weight
+                output_lines.append(fmt.heading(f"{exercise.upper()} ({bar_display}# bar)", level=3))
         else:
             output_lines.append(fmt.heading(f"{exercise.upper()}", level=3))
         output_lines.append("")  # blank line
@@ -116,9 +123,17 @@ class Program:
         # Optional 1RM line
         if print_1rm:
             if body_weight is not None:
-                s = "1RM: %d# @ BW of %d#" % ((oneRepMax - body_weight), body_weight)
+                if hasattr(fmt, 'format_weight'):
+                    weight_display = fmt.format_weight(oneRepMax - body_weight)
+                    bw_display = fmt.format_weight(body_weight)
+                    s = f"1RM: {weight_display} @ BW of {bw_display}"
+                else:
+                    s = "1RM: %d# @ BW of %d#" % ((oneRepMax - body_weight), body_weight)
             else:
-                s = "1RM: %s#" % oneRepMax
+                if hasattr(fmt, 'format_weight'):
+                    s = f"1RM: {fmt.format_weight(oneRepMax)}"
+                else:
+                    s = "1RM: %s#" % oneRepMax
             output_lines.append(s)
             output_lines.append("")
 

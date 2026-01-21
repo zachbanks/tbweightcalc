@@ -307,7 +307,7 @@ class ExerciseCluster:
         # First pass: build all sets and compute raw weights
         built_sets: list[ExerciseSet] = []
         for d in setdefs:
-            s = ExerciseSet(bar_weight=self.bar_weight)
+            s = ExerciseSet(bar_weight=self.bar_weight, formatter=self.formatter)
 
             # Deal with set/reps vs ranges
             if d.get("range"):
