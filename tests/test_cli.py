@@ -672,18 +672,24 @@ def test_interactive_template_classic_builds_expected_lifts(
     # 1. title (blank -> default)
     # 2. template = "1"
     # 3. squat 1RM
-    # 4. bench 1RM
-    # 5. deadlift 1RM
-    # 6. WPU bodyweight (blank -> skip)
-    # 7. week (blank -> all)
-    # 8. output mode "t" (text only)
+    # 4. squat bar weight (blank -> 45)
+    # 5. bench 1RM
+    # 6. bench bar weight (blank -> 45)
+    # 7. deadlift 1RM
+    # 8. deadlift bar weight (blank -> 45)
+    # 9. WPU bodyweight (blank -> skip)
+    # 10. week (blank -> all)
+    # 11. output mode "t" (text only)
     inputs = iter(
         [
             "",  # title
             "1",  # template choice -> Classic
             "455",  # squat
+            "",  # squat bar weight -> default 45
             "315",  # bench
+            "",  # bench bar weight -> default 45
             "500",  # deadlift
+            "",  # deadlift bar weight -> default 45
             "",  # WPU bodyweight skip
             "",  # week -> "all"
             "t",  # output mode
@@ -721,8 +727,11 @@ def test_interactive_template_front_squat_block_builds_expected_lifts(
             "FS Block",  # title
             "2",  # template choice -> Front-squat Block
             "355",  # front squat
+            "",  # front squat bar weight -> default 45
             "185",  # overhead press
+            "",  # overhead press bar weight -> default 45
             "495",  # deadlift
+            "",  # deadlift bar weight -> default 45
             "200",  # WPU bodyweight
             "35x4",  # WPU set
             "3",  # week = 3

@@ -59,6 +59,7 @@ class Program:
         oneRepMax,
         week="all",
         body_weight=None,
+        bar_weight=45.0,
         print_1rm=True,
         formatter: Formatter | None = None,
     ):
@@ -85,6 +86,7 @@ class Program:
                         exercise=exercise,
                         oneRepMax=oneRepMax,
                         body_weight=body_weight,
+                        bar_weight=bar_weight,
                         formatter=fmt,
                     )
                 )
@@ -95,6 +97,7 @@ class Program:
                     exercise=exercise,
                     oneRepMax=oneRepMax,
                     body_weight=body_weight,
+                    bar_weight=bar_weight,
                     formatter=fmt,
                 )
             )
@@ -104,6 +107,11 @@ class Program:
         # Header
         output_lines.append(fmt.heading(f"{exercise.upper()}", level=3))
         output_lines.append("")  # blank line
+
+        # Optional bar weight display (if not standard 45#)
+        if bar_weight != 45.0:
+            output_lines.append(f"Bar: {bar_weight}#")
+            output_lines.append("")
 
         # Optional 1RM line
         if print_1rm:

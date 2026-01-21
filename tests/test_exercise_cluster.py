@@ -284,3 +284,25 @@ def test_bench_warmup_rounds_up_for_next_big_plate():
     # up from 120 to 135 so the 45s stay on for the next set.
     warmup_weights = [s.weight for s in c.sets[:4]]
     assert warmup_weights[1] == 135
+
+
+def test_custom_bar_weight():
+    """Test that custom bar weights are used in calculations."""
+
+    # Use a 35# bar instead of standard 45#
+    c = ExerciseCluster(
+        week=1,
+        exercise="squat",
+        oneRepMax=315,
+        bar_weight=35.0
+    )
+
+    # Should have sets
+    assert len(c.sets) > 0
+
+    # First set should use the 35# bar
+    first_set = c.sets[0]
+    assert first_set.bar_weight == 35.0
+
+    # First set is empty bar set
+    assert first_set.weight == 35.0

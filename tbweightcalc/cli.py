@@ -81,20 +81,28 @@ INTERACTIVE_LIFT_SLOTS = [
 ]
 
 
-def _prompt_for_exercise_1rm(exercise_name: str) -> int | None:
+def _prompt_for_exercise_1rm(exercise_name: str) -> tuple[int | None, float]:
     """
     Look up the interactive prompt text for the given exercise_name
     from INTERACTIVE_LIFT_SLOTS and run prompt_lift_one_rm on it.
 
-    Returns an int 1RM, or None if no valid input.
+    Returns (1RM, bar_weight) where 1RM can be None if skipped.
     """
     for slot in INTERACTIVE_LIFT_SLOTS:
         for opt in slot["options"]:
             if opt["exercise_name"] == exercise_name:
-                return prompt_lift_one_rm(opt["prompt"])
+                one_rm = prompt_lift_one_rm(opt["prompt"])
+                if one_rm is None:
+                    return (None, 45.0)
+                bar_weight = prompt_bar_weight(exercise_name)
+                return (one_rm, bar_weight)
     # If not found in config, just fall back to a generic prompt.
     generic = f"{exercise_name.title()} 1RM or set (e.g. '225', '200 5', '200x5', blank to skip): "
-    return prompt_lift_one_rm(generic)
+    one_rm = prompt_lift_one_rm(generic)
+    if one_rm is None:
+        return (None, 45.0)
+    bar_weight = prompt_bar_weight(exercise_name)
+    return (one_rm, bar_weight)
 
 
 def copy_to_clipboard(text: str) -> None:
@@ -178,28 +186,29 @@ def build_program_markdown(
         # Legacy path — build from old fields for CLI flags.
         lifts: dict[str, dict] = {}
         if getattr(args, "squat", None) is not None:
-            lifts["squat"] = {"one_rm": round(args.squat), "body_weight": None}
+            lifts["squat"] = {"one_rm": round(args.squat), "body_weight": None, "bar_weight": 45.0}
         if getattr(args, "front_squat", None) is not None:
-            lifts["front squat"] = {"one_rm": round(args.front_squat), "body_weight": None}
+            lifts["front squat"] = {"one_rm": round(args.front_squat), "body_weight": None, "bar_weight": 45.0}
         if getattr(args, "zercher_squat", None) is not None:
-            lifts["zercher squat"] = {"one_rm": round(args.zercher_squat), "body_weight": None}
+            lifts["zercher squat"] = {"one_rm": round(args.zercher_squat), "body_weight": None, "bar_weight": 45.0}
         if getattr(args, "bench", None) is not None:
-            lifts["bench press"] = {"one_rm": round(args.bench), "body_weight": None}
+            lifts["bench press"] = {"one_rm": round(args.bench), "body_weight": None, "bar_weight": 45.0}
         if getattr(args, "overhead_press", None) is not None:
             lifts["overhead press"] = {
                 "one_rm": round(args.overhead_press),
                 "body_weight": None,
+                "bar_weight": 45.0,
             }
         if getattr(args, "deadlift", None) is not None:
-            lifts["deadlift"] = {"one_rm": round(args.deadlift), "body_weight": None}
+            lifts["deadlift"] = {"one_rm": round(args.deadlift), "body_weight": None, "bar_weight": 45.0}
         if getattr(args, "zercher_deadlift", None) is not None:
-            lifts["zercher deadlift"] = {"one_rm": round(args.zercher_deadlift), "body_weight": None}
+            lifts["zercher deadlift"] = {"one_rm": round(args.zercher_deadlift), "body_weight": None, "bar_weight": 45.0}
         if getattr(args, "trap_bar_deadlift", None) is not None:
-            lifts["trap bar deadlift"] = {"one_rm": round(args.trap_bar_deadlift), "body_weight": None}
+            lifts["trap bar deadlift"] = {"one_rm": round(args.trap_bar_deadlift), "body_weight": None, "bar_weight": 45.0}
         wpu = getattr(args, "weighted_pullup", None)
         if wpu is not None:
             one_rm, bw = wpu
-            lifts["weighted pullup"] = {"one_rm": one_rm, "body_weight": bw}
+            lifts["weighted pullup"] = {"one_rm": one_rm, "body_weight": bw, "bar_weight": 45.0}
 
     # Define the order in which lifts appear in the output.
     # Extend this list in the future as you add new exercise types.
@@ -225,12 +234,14 @@ def build_program_markdown(
             cfg = lifts[ex_name]
             one_rm = cfg["one_rm"]
             body_weight = cfg.get("body_weight")
+            bar_weight = cfg.get("bar_weight", 45.0)
 
             lines.append(
                 tb.Program.print_exercise(
                     exercise=ex_name,
                     oneRepMax=one_rm,
                     body_weight=body_weight,
+                    bar_weight=bar_weight,
                     formatter=fmt,
                     week=week,
                     print_1rm=True,
@@ -374,6 +385,30 @@ def parse_weighted_pullup_string(bodyweight: int, raw: str) -> int | None:
 # -------------------------------------------------------------------
 # Interactive helpers
 # -------------------------------------------------------------------
+
+
+def prompt_bar_weight(exercise_name: str) -> float:
+    """
+    Prompt for bar weight with default of 45 pounds.
+
+    Returns:
+      - float bar weight (defaults to 45.0)
+    """
+    while True:
+        raw = input(f"Bar weight for {exercise_name} (default 45): ").strip()
+
+        # Default to 45
+        if not raw:
+            return 45.0
+
+        try:
+            bar_weight = float(raw)
+            if bar_weight > 0:
+                return bar_weight
+            else:
+                print("Bar weight must be greater than 0. Try again or press Enter for default (45).")
+        except ValueError:
+            print("Invalid input. Enter a number or press Enter for default (45).")
 
 
 def prompt_lift_one_rm(label: str) -> int | None:
@@ -537,9 +572,9 @@ def run_interactive() -> None:
             preset_exercises = ["front squat", "overhead press", "deadlift"]
 
         for ex_name in preset_exercises:
-            one_rm = _prompt_for_exercise_1rm(ex_name)
+            one_rm, bar_weight = _prompt_for_exercise_1rm(ex_name)
             if one_rm is not None:
-                lifts[ex_name] = {"one_rm": one_rm, "body_weight": None}
+                lifts[ex_name] = {"one_rm": one_rm, "body_weight": None, "bar_weight": bar_weight}
 
     # ---------- Template 3: fully custom per slot ----------
     else:
@@ -575,7 +610,8 @@ def run_interactive() -> None:
                     print("No valid 1RM entered; skipping this lift.")
                     break
 
-                lifts[ex_name] = {"one_rm": one_rm, "body_weight": None}
+                bar_weight = prompt_bar_weight(ex_name)
+                lifts[ex_name] = {"one_rm": one_rm, "body_weight": None, "bar_weight": bar_weight}
                 break  # only one selection per slot
 
     # ---------- Weighted pull-up (common for all templates) ----------
