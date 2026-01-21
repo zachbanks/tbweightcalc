@@ -1,62 +1,165 @@
+# ============================================================================
 # Tactical Barbell Weight Calculator - Default Configuration
+# ============================================================================
 #
-# This file contains default settings for tbcalc. You can override these by creating
-# a config file at ~/.config/tbcalc/config.yaml or by specifying a custom path with
-# the --config flag.
+# This file contains the built-in default settings for tbcalc.
+#
+# To customize your settings, create a config file at:
+#   ~/.config/tbcalc/config.yaml
+#
+# Or specify a custom path with the --config flag:
+#   tbcalc -sq 455 --config ~/my-config.yaml
+#
+# Only include the settings you want to change - any omitted settings
+# will use the defaults shown below.
+#
+# ============================================================================
 
-# Formatting preferences
+# ----------------------------------------------------------------------------
+# FORMATTING PREFERENCES
+# ----------------------------------------------------------------------------
+# Control how weights and other values are displayed in the output
 formatting:
-  # Weight unit format: Choose how weights are displayed
-  # Options: "pounds_sign" (#), "lbs" (lbs), "pounds" (pounds)
+  # Weight unit format - choose how weights appear throughout the program
+  #
+  # Options:
+  #   "lbs"          → Displays as "135 lbs"
+  #   "pounds_sign"  → Displays as "135#"
+  #   "pounds"       → Displays as "135 pounds"
+  #
+  # Default: "lbs"
   weight_unit: "lbs"
 
-  # Show decimal places for weights
-  # If false, weights like 135.0 display as "135"
-  # If true, weights display with decimal precision
+  # Show decimal places for whole number weights
+  #
+  # If false: 135.0 displays as "135"
+  # If true:  135.0 displays as "135.0"
+  #
+  # Default: false
   show_weight_decimals: false
 
-  # Bar weight indicator text (used in exercise titles with custom bars)
-  # Example: "SQUAT (35# bar)" or "SQUAT (35 lbs bar)"
+  # Bar weight indicator text
+  #
+  # Used in exercise titles when a custom bar weight is specified
+  # Examples:
+  #   "bar"      → "SQUAT (35 lbs bar)"
+  #   "barbell"  → "SQUAT (35# barbell)"
+  #
+  # Default: "bar"
   bar_indicator: "bar"
 
-# Default bar weights
+# ----------------------------------------------------------------------------
+# DEFAULT VALUES
+# ----------------------------------------------------------------------------
+# Set default values for common parameters
 defaults:
   # Standard barbell weight in pounds
+  #
+  # Most commercial gyms use 45lb barbells (20kg)
+  # Women's bars are typically 33lb (15kg)
+  # Training bars might be 15lb or 35lb
+  #
+  # Default: 45.0
   standard_bar_weight: 45.0
 
-  # Default body weight for weighted pull-ups (can be overridden interactively)
+  # Default body weight for weighted pull-ups (optional)
+  #
+  # If set to a number, this will be used as the default
+  # If set to null, the program will prompt you interactively
+  #
+  # Default: null (prompt user)
   body_weight: null
 
-# Week percentages for the 6-week program
+# ----------------------------------------------------------------------------
+# WEEK PERCENTAGES
+# ----------------------------------------------------------------------------
+# Tactical Barbell Max Strength follows a 6-week progression
+# Each week uses a percentage of your 1RM for the working sets
+#
+# Standard TB Max Strength percentages:
+#   Weeks 1-3: Progressive overload (70%, 80%, 90%)
+#   Week 4:    Deload week (75%)
+#   Weeks 5-6: Peak weeks (85%, 95%)
+#
+# You can customize these if you want to run a modified program
 week_percentages:
   1: 70  # Week 1: 70% of 1RM
   2: 80  # Week 2: 80% of 1RM
   3: 90  # Week 3: 90% of 1RM
-  4: 75  # Week 4: 75% of 1RM (deload)
+  4: 75  # Week 4: 75% of 1RM (deload week)
   5: 85  # Week 5: 85% of 1RM
-  6: 95  # Week 6: 95% of 1RM
+  6: 95  # Week 6: 95% of 1RM (peak week)
 
-# Output preferences
+# ----------------------------------------------------------------------------
+# OUTPUT PREFERENCES
+# ----------------------------------------------------------------------------
+# Customize where and how program output is generated
 output:
-  # Default output directory for PDFs
+  # Directory where PDF files are saved
+  #
+  # Use ~ for your home directory
+  # Examples: "~/Downloads", "~/Dropbox/Training", "~/Documents"
+  #
+  # Default: "~/Downloads"
   pdf_output_dir: "~/Downloads"
 
-  # Default title format (use {date} placeholder for current date)
+  # Default title format for programs
+  #
+  # Use {date} as a placeholder that will be replaced with the current date
+  # The date format is controlled by the date_format setting below
+  #
+  # Examples:
+  #   "Tactical Barbell Max Strength: {date}"
+  #   "TB Max - {date}"
+  #   "Training Block {date}"
+  #
+  # Default: "Tactical Barbell Max Strength: {date}"
   default_title: "Tactical Barbell Max Strength: {date}"
 
-  # Date format for titles (Python strftime format)
+  # Date format for titles
+  #
+  # Uses Python strftime format codes
+  # Common formats:
+  #   "%Y-%m-%d"       → 2026-01-21
+  #   "%B %d, %Y"      → January 21, 2026
+  #   "%m/%d/%Y"       → 01/21/2026
+  #   "%Y-W%W"         → 2026-W03 (year and week number)
+  #
+  # Default: "%Y-%m-%d"
   date_format: "%Y-%m-%d"
 
-  # Copy output to clipboard (macOS only, requires pbcopy)
+  # Automatically copy program output to clipboard (macOS only)
+  #
+  # When true, the Markdown output is automatically copied to your clipboard
+  # Requires pbcopy (built-in on macOS)
+  #
+  # Set to false if you don't want automatic clipboard copying
+  #
+  # Default: true
   copy_to_clipboard: true
 
-# Available plate weights (in pounds) for plate breakdown calculations
-# Listed from heaviest to lightest
+# ----------------------------------------------------------------------------
+# AVAILABLE PLATES
+# ----------------------------------------------------------------------------
+# Define which weight plates are available for plate breakdown calculations
+#
+# The program uses this list to calculate the most efficient plate loading
+# for each exercise. Plates should be listed in descending order (heaviest first).
+#
+# Standard gym plates (pounds):
+#   45, 35, 25, 15, 10, 5, 2.5
+#
+# If your gym has limited plates, customize this list. For example:
+#   Home gym:      [45, 25, 10, 5]
+#   Metric gym:    Convert kg to lbs: 20kg = 44lbs, 15kg = 33lbs, etc.
+#   Competition:   [45, 25, 10, 5, 2.5, 1.25] (includes fractional plates)
+#
+# Default: [45, 35, 25, 15, 10, 5, 2.5]
 available_plates:
-  - 45
-  - 35
-  - 25
-  - 15
-  - 10
-  - 5
-  - 2.5
+  - 45    # Standard 45lb plates
+  - 35    # 35lb plates
+  - 25    # 25lb plates
+  - 15    # 15lb plates
+  - 10    # 10lb plates (change plates)
+  - 5     # 5lb plates (small change)
+  - 2.5   # 2.5lb fractional plates (microloading)
