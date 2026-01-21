@@ -686,6 +686,17 @@ def run_interactive() -> None:
                         print(f"{ex_name.title()} is already in your program. Choose a different exercise.")
                         continue
 
+                    # Special handling for weighted pull-ups
+                    if ex_name == "weighted pullup":
+                        wpu_1rm, bodyweight = prompt_weighted_pullup_interactive()
+                        if wpu_1rm is None:
+                            print("No valid weighted pull-up data entered; skipping this exercise.")
+                            break
+                        lifts[ex_name] = {"one_rm": wpu_1rm, "body_weight": bodyweight, "bar_weight": 45.0}
+                        print(f"Added {ex_name.title()} to your program.")
+                        break
+
+                    # Regular exercises (barbell lifts)
                     one_rm, bar_weight = _prompt_for_exercise_1rm(ex_name)
                     if one_rm is None:
                         print("No valid 1RM entered; skipping this exercise.")
