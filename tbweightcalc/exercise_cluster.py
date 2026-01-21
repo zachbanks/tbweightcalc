@@ -46,6 +46,11 @@ EXERCISE_PROFILES = {
         "warmup_scheme": "deadlift",
         "top_scheme": "deadlift",
     },
+    "rdl": {
+        "kind": "barbell",
+        "warmup_scheme": "deadlift",
+        "top_scheme": "deadlift",
+    },
     "weighted pullup": {
         "kind": "wpu",
         "warmup_scheme": None,
@@ -192,6 +197,7 @@ class ExerciseCluster:
     DEADLIFT = "deadlift"
     ZERCHER_DEADLIFT = "zercher deadlift"
     TRAP_BAR_DEADLIFT = "trap bar deadlift"
+    RDL = "rdl"
     WPU = "weighted pullup"
     OHP = "overhead press"
     FRONT_SQUAT = "front squat"

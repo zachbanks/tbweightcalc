@@ -198,6 +198,7 @@ def test_profile_exists_for_new_exercises():
     assert "zercher squat" in EXERCISE_PROFILES
     assert "zercher deadlift" in EXERCISE_PROFILES
     assert "trap bar deadlift" in EXERCISE_PROFILES
+    assert "rdl" in EXERCISE_PROFILES
 
 
 def test_front_squat_generates_sets():
@@ -247,6 +248,19 @@ def test_trap_bar_deadlift_uses_deadlift_scheme():
 
     text = str(c)
     # Deadlift warmup pattern
+    assert "2 x 5" in text
+    # Top set pattern like (1-3) x 5
+    assert "(1-3) x 5" in text
+
+
+def test_rdl_uses_deadlift_scheme():
+    c = ExerciseCluster(week=1, exercise="rdl", oneRepMax=365)
+
+    # Deadlift style: 3 warmups + 1 top set
+    assert len(c.sets) == 4
+
+    text = str(c)
+    # Deadlift warmup pattern (no bar-only set)
     assert "2 x 5" in text
     # Top set pattern like (1-3) x 5
     assert "(1-3) x 5" in text
