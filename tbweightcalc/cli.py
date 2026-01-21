@@ -224,6 +224,11 @@ def build_program_markdown(
         "weighted pullup",
     ]
 
+    # Add any extra exercises that aren't in the standard print_order
+    for ex_name in lifts:
+        if ex_name not in print_order:
+            print_order.append(ex_name)
+
     for week in weeks:
         lines.append(fmt.heading(f"WEEK {week} - {week_percentages[week]}", level=2))
         lines.append("")
@@ -647,6 +652,53 @@ def run_interactive() -> None:
 
     if weighted_pullup_entry is not None:
         lifts["weighted pullup"] = weighted_pullup_entry
+
+    # ---------- Extra exercises (custom template only) ----------
+    if template_choice == "3":
+        add_extra = input("\nWould you like to add extra exercises? (y/n, default n): ").strip().lower()
+
+        if add_extra in ("y", "yes"):
+            # Get list of all available exercises from EXERCISE_PROFILES
+            from tbweightcalc.exercise_cluster import EXERCISE_PROFILES
+            available = list(EXERCISE_PROFILES.keys())
+
+            while True:
+                print("\nAvailable exercises:")
+                for idx, ex_name in enumerate(available, start=1):
+                    print(f"  [{idx}] {ex_name.title()}")
+
+                while True:
+                    choice = input("Select exercise number: ").strip()
+                    try:
+                        idx = int(choice)
+                    except ValueError:
+                        print("Invalid choice. Enter a number.")
+                        continue
+
+                    if not (1 <= idx <= len(available)):
+                        print("Invalid option number. Try again.")
+                        continue
+
+                    ex_name = available[idx - 1]
+
+                    # Skip if already in program
+                    if ex_name in lifts:
+                        print(f"{ex_name.title()} is already in your program. Choose a different exercise.")
+                        continue
+
+                    one_rm, bar_weight = _prompt_for_exercise_1rm(ex_name)
+                    if one_rm is None:
+                        print("No valid 1RM entered; skipping this exercise.")
+                        break
+
+                    lifts[ex_name] = {"one_rm": one_rm, "body_weight": None, "bar_weight": bar_weight}
+                    print(f"Added {ex_name.title()} to your program.")
+                    break
+
+                # Ask if they want to add another
+                add_another = input("\nAdd another exercise? (y/n, default n): ").strip().lower()
+                if add_another not in ("y", "yes"):
+                    break
 
     # ---------- Week selection ----------
     week_input = input("\nWeek (1–6 or 'all', default 'all'): ").strip().lower()

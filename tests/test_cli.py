@@ -758,3 +758,66 @@ def test_interactive_template_front_squat_block_builds_expected_lifts(
     # WPU should be present with estimated 1RM and given BW
     assert "weighted pullup" in lifts
     assert lifts["weighted pullup"]["body_weight"] == 200
+
+
+def test_interactive_template_custom_with_extra_exercises(
+    monkeypatch, no_side_effects
+):
+    """
+    Template 3: Custom with extra exercises added
+    """
+    captured = no_side_effects
+
+    inputs = iter(
+        [
+            "Custom Program",  # title
+            "3",  # template choice -> Custom
+            # Lower-body main lift slot
+            "1",  # choose squat
+            "455",  # squat 1RM
+            "",  # squat bar weight -> default 45
+            # Upper-body main press slot
+            "1",  # choose bench press
+            "315",  # bench 1RM
+            "",  # bench bar weight -> default 45
+            # Hinge slot
+            "1",  # choose deadlift
+            "500",  # deadlift 1RM
+            "",  # deadlift bar weight -> default 45
+            "",  # WPU bodyweight skip
+            # Extra exercises
+            "y",  # add extra exercises? yes
+            "5",  # select overhead press (5th in EXERCISE_PROFILES keys alphabetically)
+            "185",  # overhead press 1RM
+            "",  # overhead press bar weight -> default 45
+            "y",  # add another? yes
+            "2",  # select front squat (2nd in EXERCISE_PROFILES keys alphabetically)
+            "355",  # front squat 1RM
+            "",  # front squat bar weight -> default 45
+            "n",  # add another? no
+            "",  # week -> "all"
+            "t",  # output mode
+        ]
+    )
+
+    def fake_input(prompt: str = "") -> str:
+        return next(inputs)
+
+    monkeypatch.setattr(builtins, "input", fake_input)
+
+    cli.run_interactive()
+
+    args = captured["args"]
+    lifts = args.lifts
+
+    # Standard slot selections
+    assert lifts["squat"]["one_rm"] == 455
+    assert lifts["bench press"]["one_rm"] == 315
+    assert lifts["deadlift"]["one_rm"] == 500
+    # Extra exercises added
+    assert "overhead press" in lifts
+    assert lifts["overhead press"]["one_rm"] == 185
+    assert "front squat" in lifts
+    assert lifts["front squat"]["one_rm"] == 355
+    # No WPU because we skipped BW
+    assert "weighted pullup" not in lifts
