@@ -349,19 +349,22 @@ class ExerciseCluster:
         # Second pass: apply warmup optimization with lookahead
         if profile["kind"] == "barbell":
             # First, apply individual warmup optimizations (reduce plate clutter)
-            for idx, (d, s) in enumerate(zip(setdefs, built_sets)):
-                if d.get("multiplier", 1.0) < 1.0:
-                    next_weight = None
-                    for next_set in built_sets[idx + 1 :]:
-                        next_weight = next_set.weight
-                        break
-
-                    s.weight = optimize_warmup_weight(
-                        total_weight=s.weight,
-                        bar_weight=self.bar_weight,
-                        threshold=2.5,
-                        next_total_weight=next_weight,
-                    )
+            # NOTE: We skip this optimization pass because it can create non-linearities
+            # that conflict with the second pass. The second pass (ensure_linear_warmup_progression)
+            # now handles all warmup optimization including linear progression.
+            # for idx, (d, s) in enumerate(zip(setdefs, built_sets)):
+            #     if d.get("multiplier", 1.0) < 1.0:
+            #         next_weight = None
+            #         for next_set in built_sets[idx + 1 :]:
+            #             next_weight = next_set.weight
+            #             break
+            #
+            #         s.weight = optimize_warmup_weight(
+            #             total_weight=s.weight,
+            #             bar_weight=self.bar_weight,
+            #             threshold=2.5,
+            #             next_total_weight=next_weight,
+            #         )
 
             # Second, ensure linear progression (work backwards to fix any issues)
             warmup_weights = []

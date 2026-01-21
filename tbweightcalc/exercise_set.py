@@ -336,6 +336,12 @@ def round_up_to_valid_progression(
         test_weight = bar_weight + 2.0 * sum(subset_plates)
 
         # Check if this is a valid candidate
+        # We want weights that are:
+        # 1. Greater than or equal to current_weight
+        # 2. Less than next_weight (strictly less to avoid duplicate weights)
+        # 3. Within max_increase of current_weight
+        # 4. Form a valid subset (plates are subset of next_plates)
+
         if (test_weight >= current_weight and
             test_weight < next_weight and
             test_weight <= current_weight + max_increase):
@@ -344,6 +350,28 @@ def round_up_to_valid_progression(
             if diff < best_diff:
                 best_diff = diff
                 best_weight = test_weight
+
+    # If no valid weight found that's >= current_weight, try rounding DOWN
+    # to the next lower valid subset. This is acceptable for warmups.
+    if best_weight is None:
+        # Find the largest valid subset that's less than current_weight
+        for subset_config in generate_subsets(plate_items):
+            subset_plates = []
+            for plate, count in subset_config:
+                subset_plates.extend([plate] * count)
+
+            test_weight = bar_weight + 2.0 * sum(subset_plates)
+
+            # Look for weights less than current but still reasonable
+            # Allow rounding down to bar weight as last resort
+            allow_bar_only = (test_weight == bar_weight)
+
+            if (test_weight < current_weight and
+                test_weight < next_weight and
+                (test_weight >= current_weight * 0.5 or allow_bar_only)):  # No more than 50% decrease
+
+                if best_weight is None or test_weight > best_weight:
+                    best_weight = test_weight
 
     # Return the best weight found, or original if none found
     return best_weight if best_weight is not None else current_weight
@@ -385,34 +413,81 @@ def ensure_linear_warmup_progression(
     # Each weight must be a valid progression to the next weight
     all_weights = adjusted_weights + [working_weight]
 
-    # Process backwards: for each warmup, ensure it can progress to next
-    for i in range(len(all_weights) - 2, -1, -1):
-        current = all_weights[i]
-        next_weight = all_weights[i + 1]
+    # Keep iterating until all progressions are linear or no more changes
+    max_iterations = 10
+    iteration = 0
+    changed = True
 
-        # Check if current can progress linearly to next
-        current_plates = get_plate_list(current, bar_weight, available_plates)
-        next_plates = get_plate_list(next_weight, bar_weight, available_plates)
+    while changed and iteration < max_iterations:
+        changed = False
+        iteration += 1
 
-        if not plates_are_subset(current_plates, next_plates):
-            # Need to adjust current weight
-            adjusted = round_up_to_valid_progression(
-                current,
-                next_weight,
-                bar_weight,
-                available_plates,
-                max_increase=max_increase_per_warmup,
+        # Process backwards: for each warmup, ensure it can progress to next
+        for i in range(len(all_weights) - 2, -1, -1):
+            current = all_weights[i]
+            next_weight = all_weights[i + 1]
+
+            # Also get previous weight to ensure monotonically increasing
+            prev_weight = all_weights[i - 1] if i > 0 else bar_weight
+
+            # Check if current can progress linearly to next
+            current_plates = get_plate_list(current, bar_weight, available_plates)
+            next_plates = get_plate_list(next_weight, bar_weight, available_plates)
+
+            # Check two conditions:
+            # 1. Linear progression (plates are subset)
+            # 2. Monotonic increasing (current <= next)
+            needs_adjustment = (
+                not plates_are_subset(current_plates, next_plates) or
+                current > next_weight
             )
 
-            # If we couldn't find a valid adjustment (returned original weight),
-            # try using bar-only weight as a fallback
-            if adjusted == current:
-                # Check if bar-only is a valid progression to next
-                bar_only_plates = get_plate_list(bar_weight, bar_weight, available_plates)
-                if plates_are_subset(bar_only_plates, next_plates):
-                    adjusted = bar_weight
+            if needs_adjustment:
+                # Need to adjust current weight
+                # Special case: if current > next_weight, set current = next_weight
+                # This ensures monotonicity (same weight is okay for warmups)
+                if current > next_weight:
+                    adjusted = next_weight
+                else:
+                    # Normal case: current <= next_weight but not a valid progression
+                    adjusted = round_up_to_valid_progression(
+                        current,
+                        next_weight,
+                        bar_weight,
+                        available_plates,
+                        max_increase=max_increase_per_warmup,
+                    )
 
-            all_weights[i] = adjusted
+                # If we couldn't find a valid adjustment within max_increase,
+                # only fall back to bar-only if this is the FIRST warmup
+                # For other warmups, keep the original weight (better to have a small
+                # non-linearity than to make everything bar-only)
+                if adjusted == current and i == 0:
+                    # First warmup: check if bar-only is a valid progression to next
+                    bar_only_plates = get_plate_list(bar_weight, bar_weight, available_plates)
+                    if plates_are_subset(bar_only_plates, next_plates):
+                        adjusted = bar_weight
+
+                # CRITICAL: Ensure monotonically increasing - adjusted weight must be >= previous
+                # If rounding down would create a decrease, we have a few options:
+                if adjusted < prev_weight:
+                    # Try using prev_weight if it forms a valid progression to next
+                    prev_plates = get_plate_list(prev_weight, bar_weight, available_plates)
+                    if plates_are_subset(prev_plates, next_plates):
+                        # Great! Previous weight works for this progression
+                        adjusted = prev_weight
+                    else:
+                        # Previous weight also doesn't work. Two options:
+                        # 1. Use adjusted anyway (creates backward progression but linear)
+                        # 2. Keep original (maintains forward progression but not linear)
+                        #
+                        # We choose option 1: accept the backward progression and let the
+                        # next iteration fix the previous warmup to match or be less than this one
+                        pass  # Keep adjusted as-is
+
+                if adjusted != all_weights[i]:
+                    all_weights[i] = adjusted
+                    changed = True
 
     # Return just the warmup weights (exclude working weight)
     return all_weights[:-1]
