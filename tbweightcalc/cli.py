@@ -170,8 +170,9 @@ def build_program_markdown(
     """
     Build the Tactical Barbell program markdown.
 
-    - If args.lifts is present, it is a dict:
-        { "squat": {"one_rm": 455, "body_weight": None}, ... }
+    - If args.lifts is present, it can be either:
+        - A dict: { "squat": {"one_rm": 455, "body_weight": None}, ... }
+        - A list: [{"exercise": "squat", "one_rm": 455, "body_weight": None}, ...]
       and we render based on that.
     - Otherwise, we fall back to the legacy fixed fields:
         args.squat, args.bench, args.deadlift, args.weighted_pullup, etc.
@@ -197,67 +198,59 @@ def build_program_markdown(
     else:
         weeks = list(range(1, 7))
 
-    # ----- Build a unified lifts dict -----
+    # ----- Build a unified lifts structure -----
     if hasattr(args, "lifts") and args.lifts:
-        lifts = args.lifts  # from interactive mode
+        # Check if lifts is a list (new format) or dict (legacy format)
+        if isinstance(args.lifts, list):
+            lifts_list = args.lifts
+        else:
+            # Convert dict to list for backwards compatibility
+            lifts_list = []
+            for ex_name, cfg in args.lifts.items():
+                lifts_list.append({
+                    "exercise": ex_name,
+                    "one_rm": cfg["one_rm"],
+                    "body_weight": cfg.get("body_weight"),
+                    "bar_weight": cfg.get("bar_weight", 45.0),
+                })
     else:
         # Legacy path — build from old fields for CLI flags.
-        lifts: dict[str, dict] = {}
+        lifts_list = []
         if getattr(args, "squat", None) is not None:
-            lifts["squat"] = {"one_rm": round(args.squat), "body_weight": None, "bar_weight": 45.0}
+            lifts_list.append({"exercise": "squat", "one_rm": round(args.squat), "body_weight": None, "bar_weight": 45.0})
         if getattr(args, "front_squat", None) is not None:
-            lifts["front squat"] = {"one_rm": round(args.front_squat), "body_weight": None, "bar_weight": 45.0}
+            lifts_list.append({"exercise": "front squat", "one_rm": round(args.front_squat), "body_weight": None, "bar_weight": 45.0})
         if getattr(args, "zercher_squat", None) is not None:
-            lifts["zercher squat"] = {"one_rm": round(args.zercher_squat), "body_weight": None, "bar_weight": 45.0}
+            lifts_list.append({"exercise": "zercher squat", "one_rm": round(args.zercher_squat), "body_weight": None, "bar_weight": 45.0})
         if getattr(args, "bench", None) is not None:
-            lifts["bench press"] = {"one_rm": round(args.bench), "body_weight": None, "bar_weight": 45.0}
+            lifts_list.append({"exercise": "bench press", "one_rm": round(args.bench), "body_weight": None, "bar_weight": 45.0})
         if getattr(args, "overhead_press", None) is not None:
-            lifts["overhead press"] = {
+            lifts_list.append({
+                "exercise": "overhead press",
                 "one_rm": round(args.overhead_press),
                 "body_weight": None,
                 "bar_weight": 45.0,
-            }
+            })
         if getattr(args, "deadlift", None) is not None:
-            lifts["deadlift"] = {"one_rm": round(args.deadlift), "body_weight": None, "bar_weight": 45.0}
+            lifts_list.append({"exercise": "deadlift", "one_rm": round(args.deadlift), "body_weight": None, "bar_weight": 45.0})
         if getattr(args, "zercher_deadlift", None) is not None:
-            lifts["zercher deadlift"] = {"one_rm": round(args.zercher_deadlift), "body_weight": None, "bar_weight": 45.0}
+            lifts_list.append({"exercise": "zercher deadlift", "one_rm": round(args.zercher_deadlift), "body_weight": None, "bar_weight": 45.0})
         if getattr(args, "trap_bar_deadlift", None) is not None:
-            lifts["trap bar deadlift"] = {"one_rm": round(args.trap_bar_deadlift), "body_weight": None, "bar_weight": 45.0}
+            lifts_list.append({"exercise": "trap bar deadlift", "one_rm": round(args.trap_bar_deadlift), "body_weight": None, "bar_weight": 45.0})
         wpu = getattr(args, "weighted_pullup", None)
         if wpu is not None:
             one_rm, bw = wpu
-            lifts["weighted pullup"] = {"one_rm": one_rm, "body_weight": bw, "bar_weight": 45.0}
-
-    # Define the order in which lifts appear in the output.
-    # Extend this list in the future as you add new exercise types.
-    print_order = [
-        "squat",
-        "front squat",
-        "zercher squat",
-        "bench press",
-        "overhead press",
-        "deadlift",
-        "zercher deadlift",
-        "trap bar deadlift",
-        "weighted pullup",
-    ]
-
-    # Add any extra exercises that aren't in the standard print_order
-    for ex_name in lifts:
-        if ex_name not in print_order:
-            print_order.append(ex_name)
+            lifts_list.append({"exercise": "weighted pullup", "one_rm": one_rm, "body_weight": bw, "bar_weight": 45.0})
 
     for week in weeks:
         lines.append(fmt.heading(f"WEEK {week} - {week_percentages[week]}", level=2))
         lines.append("")
 
-        for ex_name in print_order:
-            if ex_name not in lifts:
-                continue
-            cfg = lifts[ex_name]
-            one_rm = cfg["one_rm"]
-            body_weight = cfg.get("body_weight")
-            bar_weight = cfg.get("bar_weight", 45.0)
+        for lift_cfg in lifts_list:
+            ex_name = lift_cfg["exercise"]
+            one_rm = lift_cfg["one_rm"]
+            body_weight = lift_cfg.get("body_weight")
+            bar_weight = lift_cfg.get("bar_weight", 45.0)
 
             lines.append(
                 tb.Program.print_exercise(
@@ -585,7 +578,7 @@ def run_interactive() -> None:
     if template_choice not in ("1", "2", "3"):
         template_choice = "1"
 
-    lifts: dict[str, dict] = {}
+    lifts: list[dict] = []
 
     # ---------- Template 1 & 2: quick combos ----------
     if template_choice in ("1", "2"):
@@ -597,7 +590,7 @@ def run_interactive() -> None:
         for ex_name in preset_exercises:
             one_rm, bar_weight = _prompt_for_exercise_1rm(ex_name)
             if one_rm is not None:
-                lifts[ex_name] = {"one_rm": one_rm, "body_weight": None, "bar_weight": bar_weight}
+                lifts.append({"exercise": ex_name, "one_rm": one_rm, "body_weight": None, "bar_weight": bar_weight})
 
     # ---------- Template 3: fully custom per slot ----------
     else:
@@ -634,7 +627,7 @@ def run_interactive() -> None:
                     break
 
                 bar_weight = prompt_bar_weight(ex_name)
-                lifts[ex_name] = {"one_rm": one_rm, "body_weight": None, "bar_weight": bar_weight}
+                lifts.append({"exercise": ex_name, "one_rm": one_rm, "body_weight": None, "bar_weight": bar_weight})
                 break  # only one selection per slot
 
     # ---------- Weighted pull-up (common for all templates) ----------
@@ -669,7 +662,12 @@ def run_interactive() -> None:
                 break
 
     if weighted_pullup_entry is not None:
-        lifts["weighted pullup"] = weighted_pullup_entry
+        lifts.append({
+            "exercise": "weighted pullup",
+            "one_rm": weighted_pullup_entry["one_rm"],
+            "body_weight": weighted_pullup_entry["body_weight"],
+            "bar_weight": 45.0,
+        })
 
     # ---------- Extra exercises (custom template only) ----------
     if template_choice == "3":
@@ -705,7 +703,7 @@ def run_interactive() -> None:
                         if wpu_1rm is None:
                             print("No valid weighted pull-up data entered; skipping this exercise.")
                             break
-                        lifts[ex_name] = {"one_rm": wpu_1rm, "body_weight": bodyweight, "bar_weight": 45.0}
+                        lifts.append({"exercise": ex_name, "one_rm": wpu_1rm, "body_weight": bodyweight, "bar_weight": 45.0})
                         print(f"Added {format_exercise_name(ex_name)} to your program.")
                         break
 
@@ -715,7 +713,7 @@ def run_interactive() -> None:
                         print("No valid 1RM entered; skipping this exercise.")
                         break
 
-                    lifts[ex_name] = {"one_rm": one_rm, "body_weight": None, "bar_weight": bar_weight}
+                    lifts.append({"exercise": ex_name, "one_rm": one_rm, "body_weight": None, "bar_weight": bar_weight})
                     print(f"Added {format_exercise_name(ex_name)} to your program.")
                     break
 
