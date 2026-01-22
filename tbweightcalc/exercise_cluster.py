@@ -210,6 +210,7 @@ class ExerciseCluster:
         oneRepMax=0,
         body_weight=None,
         bar_weight=45.0,
+        bar_label: str | None = None,
         formatter: Formatter | None = None,
     ):
         self.week = week
@@ -217,6 +218,7 @@ class ExerciseCluster:
         self.oneRepMax = oneRepMax
         self.body_weight = body_weight
         self.bar_weight = bar_weight
+        self.bar_label = bar_label
         self.sets: list[ExerciseSet] = []
         self.formatter = formatter or PlainFormatter()
         self.calc_sets()
@@ -307,7 +309,7 @@ class ExerciseCluster:
         # First pass: build all sets and compute raw weights
         built_sets: list[ExerciseSet] = []
         for d in setdefs:
-            s = ExerciseSet(bar_weight=self.bar_weight, formatter=self.formatter)
+            s = ExerciseSet(bar_weight=self.bar_weight, bar_label=self.bar_label, formatter=self.formatter)
 
             # Deal with set/reps vs ranges
             if d.get("range"):

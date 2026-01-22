@@ -100,28 +100,28 @@ INTERACTIVE_LIFT_SLOTS = [
 ]
 
 
-def _prompt_for_exercise_1rm(exercise_name: str) -> tuple[int | None, float]:
+def _prompt_for_exercise_1rm(exercise_name: str) -> tuple[int | None, float, str | None]:
     """
     Look up the interactive prompt text for the given exercise_name
     from INTERACTIVE_LIFT_SLOTS and run prompt_lift_one_rm on it.
 
-    Returns (1RM, bar_weight) where 1RM can be None if skipped.
+    Returns (1RM, bar_weight, bar_label) where 1RM can be None if skipped.
     """
     for slot in INTERACTIVE_LIFT_SLOTS:
         for opt in slot["options"]:
             if opt["exercise_name"] == exercise_name:
                 one_rm = prompt_lift_one_rm(opt["prompt"])
                 if one_rm is None:
-                    return (None, 45.0)
-                bar_weight = prompt_bar_weight(exercise_name)
-                return (one_rm, bar_weight)
+                    return (None, 45.0, None)
+                bar_weight, bar_label = prompt_bar_weight(exercise_name)
+                return (one_rm, bar_weight, bar_label)
     # If not found in config, just fall back to a generic prompt.
     generic = f"{format_exercise_name(exercise_name)} 1RM or set (e.g. '225', '200 5', '200x5', blank to skip): "
     one_rm = prompt_lift_one_rm(generic)
     if one_rm is None:
-        return (None, 45.0)
-    bar_weight = prompt_bar_weight(exercise_name)
-    return (one_rm, bar_weight)
+        return (None, 45.0, None)
+    bar_weight, bar_label = prompt_bar_weight(exercise_name)
+    return (one_rm, bar_weight, bar_label)
 
 
 def copy_to_clipboard(text: str) -> None:
@@ -260,6 +260,7 @@ def build_program_markdown(
             one_rm = lift_cfg["one_rm"]
             body_weight = lift_cfg.get("body_weight")
             bar_weight = lift_cfg.get("bar_weight", 45.0)
+            bar_label = lift_cfg.get("bar_label")
 
             lines.append(
                 tb.Program.print_exercise(
@@ -267,6 +268,7 @@ def build_program_markdown(
                     oneRepMax=one_rm,
                     body_weight=body_weight,
                     bar_weight=bar_weight,
+                    bar_label=bar_label,
                     formatter=fmt,
                     week=week,
                     print_1rm=True,
@@ -412,28 +414,32 @@ def parse_weighted_pullup_string(bodyweight: int, raw: str) -> int | None:
 # -------------------------------------------------------------------
 
 
-def prompt_bar_weight(exercise_name: str) -> float:
+def prompt_bar_weight(exercise_name: str) -> tuple[float, str | None]:
     """
-    Prompt for bar weight with default of 45 pounds.
+    Prompt for bar weight with default of 45 pounds and optional label.
 
     Returns:
-      - float bar weight (defaults to 45.0)
+      - tuple of (bar_weight, bar_label) where bar_label can be None
     """
     while True:
         raw = input(f"Bar weight for {exercise_name} (default 45): ").strip()
 
         # Default to 45
         if not raw:
-            return 45.0
+            bar_weight = 45.0
+        else:
+            try:
+                bar_weight = float(raw)
+                if bar_weight <= 0:
+                    print("Bar weight must be greater than 0. Try again or press Enter for default (45).")
+                    continue
+            except ValueError:
+                print("Invalid input. Enter a number or press Enter for default (45).")
+                continue
 
-        try:
-            bar_weight = float(raw)
-            if bar_weight > 0:
-                return bar_weight
-            else:
-                print("Bar weight must be greater than 0. Try again or press Enter for default (45).")
-        except ValueError:
-            print("Invalid input. Enter a number or press Enter for default (45).")
+        # Ask for optional label
+        label = input(f"Optional label for bar (e.g. 'Safety Squat Bar', blank to skip): ").strip()
+        return (bar_weight, label if label else None)
 
 
 def prompt_lift_one_rm(label: str) -> int | None:
@@ -597,9 +603,9 @@ def run_interactive() -> None:
             preset_exercises = ["front squat", "overhead press", "deadlift"]
 
         for ex_name in preset_exercises:
-            one_rm, bar_weight = _prompt_for_exercise_1rm(ex_name)
+            one_rm, bar_weight, bar_label = _prompt_for_exercise_1rm(ex_name)
             if one_rm is not None:
-                lifts.append({"exercise": ex_name, "one_rm": one_rm, "body_weight": None, "bar_weight": bar_weight})
+                lifts.append({"exercise": ex_name, "one_rm": one_rm, "body_weight": None, "bar_weight": bar_weight, "bar_label": bar_label})
 
     # ---------- Template 3: fully custom per slot ----------
     else:
@@ -635,8 +641,8 @@ def run_interactive() -> None:
                     print("No valid 1RM entered; skipping this lift.")
                     break
 
-                bar_weight = prompt_bar_weight(ex_name)
-                lifts.append({"exercise": ex_name, "one_rm": one_rm, "body_weight": None, "bar_weight": bar_weight})
+                bar_weight, bar_label = prompt_bar_weight(ex_name)
+                lifts.append({"exercise": ex_name, "one_rm": one_rm, "body_weight": None, "bar_weight": bar_weight, "bar_label": bar_label})
                 break  # only one selection per slot
 
     # ---------- Weighted pull-up (common for all templates) ----------
@@ -717,12 +723,12 @@ def run_interactive() -> None:
                         break
 
                     # Regular exercises (barbell lifts)
-                    one_rm, bar_weight = _prompt_for_exercise_1rm(ex_name)
+                    one_rm, bar_weight, bar_label = _prompt_for_exercise_1rm(ex_name)
                     if one_rm is None:
                         print("No valid 1RM entered; skipping this exercise.")
                         break
 
-                    lifts.append({"exercise": ex_name, "one_rm": one_rm, "body_weight": None, "bar_weight": bar_weight})
+                    lifts.append({"exercise": ex_name, "one_rm": one_rm, "body_weight": None, "bar_weight": bar_weight, "bar_label": bar_label})
                     print(f"Added {format_exercise_name(ex_name)} to your program.")
                     break
 

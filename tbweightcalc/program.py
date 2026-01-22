@@ -60,6 +60,7 @@ class Program:
         week="all",
         body_weight=None,
         bar_weight=45.0,
+        bar_label: str | None = None,
         print_1rm=True,
         formatter: Formatter | None = None,
     ):
@@ -87,6 +88,7 @@ class Program:
                         oneRepMax=oneRepMax,
                         body_weight=body_weight,
                         bar_weight=bar_weight,
+                        bar_label=bar_label,
                         formatter=fmt,
                     )
                 )
@@ -98,6 +100,7 @@ class Program:
                     oneRepMax=oneRepMax,
                     body_weight=body_weight,
                     bar_weight=bar_weight,
+                    bar_label=bar_label,
                     formatter=fmt,
                 )
             )

@@ -174,6 +174,33 @@ class TestExerciseSet(unittest.TestCase):
             self.assertTrue(out.startswith("5 x 5 - 230"))
             self.assertNotIn("(45 x 2)", out)
 
+        def test_bar_label_with_bar_only_weight(self):
+            # Test that bar label appears when weight is bar-only (45 lbs)
+            s = ExerciseSet(weight=45, bar_weight=45, bar_label="Safety Squat Bar")
+            self.assertEqual(s.plate_breakdown, "Safety Squat Bar - 45 lbs")
+
+            # Test with different bar weight
+            s = ExerciseSet(weight=55, bar_weight=55, bar_label="Trap Bar")
+            self.assertEqual(s.plate_breakdown, "Trap Bar - 55 lbs")
+
+        def test_bar_label_without_label(self):
+            # Test that default "Bar" is shown when no label is provided
+            s = ExerciseSet(weight=45, bar_weight=45)
+            self.assertEqual(s.plate_breakdown, "Bar")
+
+            # Test with no label but custom bar weight
+            s = ExerciseSet(weight=55, bar_weight=55)
+            self.assertEqual(s.plate_breakdown, "Bar")
+
+        def test_bar_label_with_plates(self):
+            # When weight > bar_weight, label should NOT appear in plate breakdown
+            # The label is only for bar-only sets
+            s = ExerciseSet(weight=135, bar_weight=45, bar_label="Custom Bar")
+            self.assertEqual(s.plate_breakdown, "45")
+
+            s = ExerciseSet(weight=225, bar_weight=45, bar_label="Custom Bar")
+            self.assertEqual(s.plate_breakdown, "(45 x 2)")
+
 
 import tbweightcalc.exercise_set as es
 

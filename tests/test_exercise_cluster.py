@@ -320,3 +320,53 @@ def test_custom_bar_weight():
 
     # First set is empty bar set
     assert first_set.weight == 35.0
+
+
+def test_bar_label_in_exercise_cluster():
+    """Test that bar labels are propagated through ExerciseCluster."""
+
+    # Create cluster with bar label
+    c = ExerciseCluster(
+        week=1,
+        exercise="squat",
+        oneRepMax=315,
+        bar_weight=55.0,
+        bar_label="Safety Squat Bar"
+    )
+
+    # Should have sets
+    assert len(c.sets) > 0
+
+    # First set should use the custom bar weight and label
+    first_set = c.sets[0]
+    assert first_set.bar_weight == 55.0
+    assert first_set.bar_label == "Safety Squat Bar"
+
+    # First set is bar-only, so plate breakdown should show label
+    assert first_set.weight == 55.0
+    assert first_set.plate_breakdown == "Safety Squat Bar - 55 lbs"
+
+    # Check that it appears in the rendered output
+    output = str(c)
+    assert "Safety Squat Bar - 55 lbs" in output
+
+
+def test_bar_label_without_label():
+    """Test that clusters work fine without bar labels (backward compatibility)."""
+
+    c = ExerciseCluster(
+        week=1,
+        exercise="bench press",
+        oneRepMax=255,
+        bar_weight=45.0
+    )
+
+    # First set should be bar-only without label
+    first_set = c.sets[0]
+    assert first_set.bar_weight == 45.0
+    assert first_set.bar_label is None
+    assert first_set.plate_breakdown == "Bar"
+
+    # Check output
+    output = str(c)
+    assert "Bar" in output

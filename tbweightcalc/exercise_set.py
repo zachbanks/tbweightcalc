@@ -14,6 +14,7 @@ class ExerciseSet:
         weight=0,
         bar=True,
         bar_weight=45,
+        bar_label: str | None = None,
         plate_breakdown_on=True,
         formatter: "Formatter | None" = None,
     ):
@@ -23,6 +24,7 @@ class ExerciseSet:
         self.max_reps = max_reps
         self.bar = bar
         self.bar_weight = bar_weight
+        self.bar_label = bar_label
         self.weight = (
             weight  # Bar and bar weight must be before weight method is called.
         )
@@ -172,7 +174,11 @@ class ExerciseSet:
         if self.bar == False and corrected_weight <= 0:
             final_string = "Bodyweight"
         elif self.bar == True and corrected_weight <= self.bar_weight:
-            final_string = "Bar"
+            # Use custom label if provided, otherwise default to "Bar"
+            if self.bar_label:
+                final_string = f"{self.bar_label} - {int(self.bar_weight)} lbs"
+            else:
+                final_string = "Bar"
 
         return final_string.strip()
 
