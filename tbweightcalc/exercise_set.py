@@ -357,29 +357,8 @@ def round_up_to_valid_progression(
                 best_diff = diff
                 best_weight = test_weight
 
-    # If no valid weight found that's >= current_weight, try rounding DOWN
-    # to the next lower valid subset. This is acceptable for warmups.
-    if best_weight is None:
-        # Find the largest valid subset that's less than current_weight
-        for subset_config in generate_subsets(plate_items):
-            subset_plates = []
-            for plate, count in subset_config:
-                subset_plates.extend([plate] * count)
-
-            test_weight = bar_weight + 2.0 * sum(subset_plates)
-
-            # Look for weights less than current but still reasonable
-            # Allow rounding down to bar weight as last resort
-            allow_bar_only = (test_weight == bar_weight)
-
-            if (test_weight < current_weight and
-                test_weight < next_weight and
-                (test_weight >= current_weight * 0.5 or allow_bar_only)):  # No more than 50% decrease
-
-                if best_weight is None or test_weight > best_weight:
-                    best_weight = test_weight
-
-    # Return the best weight found, or original if none found
+    # If no valid weight found within constraints, return original
+    # Don't try to round down as that can cause significant decreases
     return best_weight if best_weight is not None else current_weight
 
 
@@ -523,9 +502,10 @@ def ensure_linear_warmup_progression(
                     if best_candidate:
                         adjusted = best_candidate
                     else:
-                        # No valid weight between prev and next - keep original
-                        # This will create a non-linearity, but that's better than duplicates
-                        adjusted = current
+                        # No valid weight strictly between prev and next
+                        # Use next_weight itself to ensure linear progression (allows duplicate)
+                        # Linear progression is more important than avoiding duplicates for warmups
+                        adjusted = next_weight
 
                 # Handle the case where adjusted < prev_weight (backward progression)
                 elif adjusted < prev_weight:
@@ -644,15 +624,20 @@ def optimize_warmup_weight(
     # Always check if we need to adjust for linear progression, regardless of whether
     # we optimized in phase 2
     if next_total_weight and next_total_weight > optimized_weight:
-        adjusted = round_up_to_valid_progression(
-            optimized_weight,
-            next_total_weight,
-            bar_weight,
-            available_plates,
-            max_increase=20.0,  # Allow up to 20 lbs increase to fix progression
-        )
-        # Only use the adjusted weight if it actually improved the progression
-        if adjusted != optimized_weight:
-            optimized_weight = adjusted
+        # Only try to fix progression if the gap is reasonable
+        # If gap per side exceeds big_plate_slack * 2, don't force linear progression
+        gap_per_side = (next_total_weight - optimized_weight) / 2.0
+        if gap_per_side <= big_plate_slack * 2:
+            adjusted = round_up_to_valid_progression(
+                optimized_weight,
+                next_total_weight,
+                bar_weight,
+                available_plates,
+                max_increase=20.0,  # Allow up to 20 lbs increase to fix progression
+            )
+            # Only use the adjusted weight if it's not a drastic decrease
+            # (adjusted should be >= optimized_weight * 0.8 to avoid large drops)
+            if adjusted != optimized_weight and adjusted >= optimized_weight * 0.8:
+                optimized_weight = adjusted
 
     return optimized_weight
