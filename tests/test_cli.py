@@ -618,7 +618,10 @@ def test_interactive_template_classic_builds_expected_lifts(
     cli.run_interactive()
 
     args = captured["args"]
-    lifts = args.lifts
+    lifts_list = args.lifts
+
+    # Convert list to dict for easier assertions
+    lifts = {lift["exercise"]: lift for lift in lifts_list}
 
     assert lifts["squat"]["one_rm"] == 455
     assert lifts["bench press"]["one_rm"] == 315
@@ -657,7 +660,10 @@ def test_interactive_template_front_squat_block_builds_expected_lifts(
     cli.run_interactive()
 
     args = captured["args"]
-    lifts = args.lifts
+    lifts_list = args.lifts
+
+    # Convert list to dict for easier assertions
+    lifts = {lift["exercise"]: lift for lift in lifts_list}
 
     assert "squat" not in lifts
     assert "bench press" not in lifts
@@ -714,23 +720,29 @@ def test_interactive_template_classic_builds_expected_lifts(
     # 2. template = "1"
     # 3. squat 1RM
     # 4. squat bar weight (blank -> 45)
-    # 5. bench 1RM
-    # 6. bench bar weight (blank -> 45)
-    # 7. deadlift 1RM
-    # 8. deadlift bar weight (blank -> 45)
-    # 9. WPU bodyweight (blank -> skip)
-    # 10. week (blank -> all)
-    # 11. output mode "t" (text only)
+    # 5. squat bar label (blank -> no label)
+    # 6. bench 1RM
+    # 7. bench bar weight (blank -> 45)
+    # 8. bench bar label (blank -> no label)
+    # 9. deadlift 1RM
+    # 10. deadlift bar weight (blank -> 45)
+    # 11. deadlift bar label (blank -> no label)
+    # 12. WPU bodyweight (blank -> skip)
+    # 13. week (blank -> all)
+    # 14. output mode "t" (text only)
     inputs = iter(
         [
             "",  # title
             "1",  # template choice -> Classic
             "455",  # squat
             "",  # squat bar weight -> default 45
+            "",  # squat bar label -> no label
             "315",  # bench
             "",  # bench bar weight -> default 45
+            "",  # bench bar label -> no label
             "500",  # deadlift
             "",  # deadlift bar weight -> default 45
+            "",  # deadlift bar label -> no label
             "",  # WPU bodyweight skip
             "",  # week -> "all"
             "t",  # output mode
@@ -746,7 +758,10 @@ def test_interactive_template_classic_builds_expected_lifts(
     cli.run_interactive()
 
     args = captured["args"]
-    lifts = args.lifts
+    lifts_list = args.lifts
+
+    # Convert list to dict for easier assertions
+    lifts = {lift["exercise"]: lift for lift in lifts_list}
 
     assert lifts["squat"]["one_rm"] == 455
     assert lifts["bench press"]["one_rm"] == 315
@@ -769,10 +784,13 @@ def test_interactive_template_front_squat_block_builds_expected_lifts(
             "2",  # template choice -> Front-squat Block
             "355",  # front squat
             "",  # front squat bar weight -> default 45
+            "",  # front squat bar label -> no label
             "185",  # overhead press
             "",  # overhead press bar weight -> default 45
+            "",  # overhead press bar label -> no label
             "495",  # deadlift
             "",  # deadlift bar weight -> default 45
+            "",  # deadlift bar label -> no label
             "200",  # WPU bodyweight
             "35x4",  # WPU set
             "3",  # week = 3
@@ -789,7 +807,10 @@ def test_interactive_template_front_squat_block_builds_expected_lifts(
     cli.run_interactive()
 
     args = captured["args"]
-    lifts = args.lifts
+    lifts_list = args.lifts
+
+    # Convert list to dict for easier assertions
+    lifts = {lift["exercise"]: lift for lift in lifts_list}
 
     assert "squat" not in lifts
     assert "bench press" not in lifts
@@ -817,24 +838,29 @@ def test_interactive_template_custom_with_extra_exercises(
             "1",  # choose squat
             "455",  # squat 1RM
             "",  # squat bar weight -> default 45
+            "",  # squat bar label -> no label
             # Upper-body main press slot
             "1",  # choose bench press
             "315",  # bench 1RM
             "",  # bench bar weight -> default 45
+            "",  # bench bar label -> no label
             # Hinge slot
             "1",  # choose deadlift
             "500",  # deadlift 1RM
             "",  # deadlift bar weight -> default 45
+            "",  # deadlift bar label -> no label
             "",  # WPU bodyweight skip
             # Extra exercises
             "y",  # add extra exercises? yes
             "5",  # select overhead press (5th in EXERCISE_PROFILES keys alphabetically)
             "185",  # overhead press 1RM
             "",  # overhead press bar weight -> default 45
+            "",  # overhead press bar label -> no label
             "y",  # add another? yes
             "2",  # select front squat (2nd in EXERCISE_PROFILES keys alphabetically)
             "355",  # front squat 1RM
             "",  # front squat bar weight -> default 45
+            "",  # front squat bar label -> no label
             "n",  # add another? no
             "",  # week -> "all"
             "t",  # output mode
@@ -849,7 +875,10 @@ def test_interactive_template_custom_with_extra_exercises(
     cli.run_interactive()
 
     args = captured["args"]
-    lifts = args.lifts
+    lifts_list = args.lifts
+
+    # Convert list to dict for easier assertions
+    lifts = {lift["exercise"]: lift for lift in lifts_list}
 
     # Standard slot selections
     assert lifts["squat"]["one_rm"] == 455
