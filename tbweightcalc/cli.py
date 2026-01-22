@@ -639,26 +639,31 @@ def run_interactive() -> None:
     print(
         "  [2] Front-Squat Block: Front Squat / Overhead Press / Deadlift / Weighted Pull-Up"
     )
-    print("  [3] Custom: choose lifts manually")
-    template_choice = input("Template [1/2/3, default 1]: ").strip()
-    if template_choice not in ("1", "2", "3"):
+    print(
+        "  [3] Zercher Block: Zercher Squat / Bench Press / Deadlift / Weighted Pull-Up"
+    )
+    print("  [4] Custom: choose lifts manually")
+    template_choice = input("Template [1/2/3/4, default 1]: ").strip()
+    if template_choice not in ("1", "2", "3", "4"):
         template_choice = "1"
 
     lifts: list[dict] = []
 
-    # ---------- Template 1 & 2: quick combos ----------
-    if template_choice in ("1", "2"):
+    # ---------- Template 1, 2 & 3: quick combos ----------
+    if template_choice in ("1", "2", "3"):
         if template_choice == "1":
             preset_exercises = ["squat", "bench press", "deadlift"]
-        else:
+        elif template_choice == "2":
             preset_exercises = ["front squat", "overhead press", "deadlift"]
+        else:  # template_choice == "3"
+            preset_exercises = ["zercher squat", "bench press", "deadlift"]
 
         for ex_name in preset_exercises:
             one_rm, bar_weight, bar_label = _prompt_for_exercise_1rm(ex_name)
             if one_rm is not None:
                 lifts.append({"exercise": ex_name, "one_rm": one_rm, "body_weight": None, "bar_weight": bar_weight, "bar_label": bar_label})
 
-    # ---------- Template 3: fully custom per slot ----------
+    # ---------- Template 4: fully custom per slot ----------
     else:
         for slot in INTERACTIVE_LIFT_SLOTS:
             name = slot["name"]
@@ -736,7 +741,7 @@ def run_interactive() -> None:
         })
 
     # ---------- Extra exercises (custom template only) ----------
-    if template_choice == "3":
+    if template_choice == "4":
         add_extra = input("\nWould you like to add extra exercises? (y/n, default n): ").strip().lower()
 
         if add_extra in ("y", "yes"):
