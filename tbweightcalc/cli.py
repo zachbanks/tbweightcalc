@@ -293,6 +293,42 @@ def build_program_markdown(
 # -------------------------------------------------------------------
 
 
+def evaluate_weight_expression(base_weight: float, expression: str) -> float:
+    """
+    Evaluate a math expression on a base weight.
+
+    Examples:
+      - "+ 10%" -> base_weight + (base_weight * 0.10)
+      - "- 5%" -> base_weight - (base_weight * 0.05)
+      - "+ 20" or "+ 20 lbs" -> base_weight + 20
+      - "- 10" or "- 10 lbs" -> base_weight - 10
+
+    Returns the calculated weight.
+    """
+    expr = expression.strip()
+
+    # Match pattern: operator (+ or -), number, optional % or lbs
+    match = re.match(r'^([+\-])\s*(\d+(?:\.\d+)?)\s*(%|lbs?)?$', expr, re.IGNORECASE)
+    if not match:
+        raise ValueError(f"Invalid expression: {expression}")
+
+    operator = match.group(1)
+    value = float(match.group(2))
+    unit = match.group(3)
+
+    if unit and unit.strip().lower().startswith('%'):
+        # Percentage calculation
+        adjustment = base_weight * (value / 100.0)
+    else:
+        # Absolute value (lbs or no unit means lbs)
+        adjustment = value
+
+    if operator == '+':
+        return base_weight + adjustment
+    else:  # operator == '-'
+        return base_weight - adjustment
+
+
 def parse_one_rm_string(raw: str) -> int | None:
     """
     Parse generic 1RM input string.
@@ -303,10 +339,25 @@ def parse_one_rm_string(raw: str) -> int | None:
       - '240 5' or '240.5 5'    -> estimate 1RM from weight x reps (rounded)
       - '240x5', '240 x5',
         '240x 5', '240 x 5'     -> same as above
+      - '240 + 10%'             -> 240 + 10% of 240 = 264
+      - '240 - 5%'              -> 240 - 5% of 240 = 228
+      - '240 + 20' or '240 + 20 lbs' -> 240 + 20 = 260
+      - '240 - 10' or '240 - 10 lbs' -> 240 - 10 = 230
     """
     raw = raw.strip()
     if not raw:
         return None
+
+    # Check for math expressions: '240 + 10%', '240 - 5%', '240 + 20', etc.
+    expr_match = re.match(r'^(\d+(?:\.\d+)?)\s*([+\-]\s*\d+(?:\.\d+)?\s*(?:%|lbs?)?)$', raw, re.IGNORECASE)
+    if expr_match:
+        base = float(expr_match.group(1))
+        expression = expr_match.group(2)
+        try:
+            result = evaluate_weight_expression(base, expression)
+            return round(result)
+        except ValueError:
+            return None
 
     # '240x5' / '240.5x5' / '240 x5' / '240x 5' / '240 x 5'
     m = re.match(r"^(\d+(?:\.\d+)?)\s*[xX]\s*(\d+)$", raw)

@@ -133,6 +133,91 @@ pipx upgrade tbweightcalc
 
 ---
 
+# 🧮 Math Expressions for 1RM Input
+
+TBWeightCalc supports math expressions when entering 1RM values, allowing you to easily calculate adjustments without doing mental math.
+
+## Expression Syntax
+
+When prompted for a 1RM, you can use the following formats:
+
+### Percentage-Based Calculations
+
+Add or subtract a percentage of the base weight:
+
+```bash
+240 + 10%    # 240 + (240 × 0.10) = 264
+240 - 5%     # 240 - (240 × 0.05) = 228
+300 + 15%    # 300 + (300 × 0.15) = 345
+```
+
+### Absolute Value Calculations
+
+Add or subtract a fixed amount (in lbs):
+
+```bash
+240 + 20        # 240 + 20 = 260
+240 + 20 lbs    # Same as above (lbs is optional)
+240 - 10        # 240 - 10 = 230
+240 - 10 lbs    # Same as above
+```
+
+**Note:** If no unit is specified, the number is assumed to be in lbs.
+
+## Use Cases
+
+### Progressive Overload
+Easily calculate your next training cycle's weights:
+
+```bash
+# Current 1RM is 315, want to increase by 2.5%
+315 + 2.5%   # = 323
+```
+
+### Deload Weeks
+Quickly calculate reduced weights for recovery:
+
+```bash
+# Deload to 85% of your current max
+405 - 15%    # = 344
+```
+
+### Testing Day Adjustments
+Calculate attempts based on your opener:
+
+```bash
+# Opener at 240, second attempt +10 lbs
+240 + 10     # = 250
+```
+
+## Examples in Interactive Mode
+
+```bash
+$ tbcalc
+[Interactive mode prompts...]
+
+Squat 1RM or set (e.g. '225', '200 5', '200x5', blank to skip): 315 + 5%
+# Calculates: 331
+
+Bench Press 1RM or set: 225 - 10 lbs
+# Calculates: 215
+
+Deadlift 1RM or set: 405 + 2.5%
+# Calculates: 415
+```
+
+## Traditional Input Methods Still Supported
+
+All existing input methods continue to work:
+
+```bash
+455           # Direct 1RM
+240 5         # Calculate from weight × reps
+240x5         # Same as above with 'x' separator
+```
+
+---
+
 # ⚙️ Configuration
 
 TBWeightCalc supports customization through YAML configuration files. This allows you to personalize weight formatting, default values, and output preferences without modifying code.
