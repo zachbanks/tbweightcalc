@@ -38,8 +38,8 @@ class TestPrintExerciseBarWeight:
             formatter=PlainFormatter(),
         )
 
-        # Should show "SQUAT (35 lbs)" with PlainFormatter
-        assert "SQUAT (35 lbs)" in output
+        # Should show "SQUAT (35 lbs Bar)" with PlainFormatter
+        assert "SQUAT (35 lbs Bar)" in output
         # Should not show decimal point
         assert "35.0" not in output
 
@@ -54,8 +54,8 @@ class TestPrintExerciseBarWeight:
             formatter=PlainFormatter(),
         )
 
-        # Should show "SQUAT (33.5 lbs)" with PlainFormatter
-        assert "SQUAT (33.5 lbs)" in output
+        # Should show "SQUAT (33.5 lbs Bar)" with PlainFormatter
+        assert "SQUAT (33.5 lbs Bar)" in output
 
     def test_custom_bar_weight_with_multiple_exercises(self):
         """Test different bar weights on different exercises."""
@@ -82,7 +82,7 @@ class TestPrintExerciseBarWeight:
         assert "DEADLIFT" in output1
         assert "bar" not in output1.lower()
 
-        assert "OVERHEAD PRESS (15 lbs)" in output2
+        assert "OVERHEAD PRESS (15 lbs Bar)" in output2
 
     def test_custom_bar_weight_all_weeks(self):
         """Custom bar weight should appear in all weeks when week='all'."""
@@ -96,7 +96,7 @@ class TestPrintExerciseBarWeight:
         )
 
         # Should appear multiple times (once per week header)
-        assert output.count("BENCH PRESS (55 lbs)") == 6  # One for each of 6 weeks
+        assert output.count("BENCH PRESS (55 lbs Bar)") == 6  # One for each of 6 weeks
 
     def test_bar_label_in_title(self):
         """Bar label should appear in exercise title, not in individual reps."""

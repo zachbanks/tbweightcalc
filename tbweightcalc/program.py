@@ -120,7 +120,7 @@ class Program:
             if bar_label:
                 output_lines.append(fmt.heading(f"{exercise.upper()} ({bar_label} - {bar_display})", level=3))
             else:
-                output_lines.append(fmt.heading(f"{exercise.upper()} ({bar_display})", level=3))
+                output_lines.append(fmt.heading(f"{exercise.upper()} ({bar_display} Bar)", level=3))
         else:
             output_lines.append(fmt.heading(f"{exercise.upper()}", level=3))
         output_lines.append("")  # blank line
