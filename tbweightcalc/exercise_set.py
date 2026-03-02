@@ -621,13 +621,11 @@ def optimize_warmup_weight(
             optimized_weight = bar_weight + 2.0 * new_per_side
 
     # PHASE 3: Ensure linear progression to next set
-    # Always check if we need to adjust for linear progression, regardless of whether
-    # we optimized in phase 2
+    # Only apply this when the gap is small (within big_plate_slack per side).
+    # For larger gaps, keep the multiplier-based weight to avoid creating big warmup jumps.
     if next_total_weight and next_total_weight > optimized_weight:
-        # Only try to fix progression if the gap is reasonable
-        # If gap per side exceeds big_plate_slack * 2, don't force linear progression
         gap_per_side = (next_total_weight - optimized_weight) / 2.0
-        if gap_per_side <= big_plate_slack * 2:
+        if gap_per_side <= big_plate_slack:
             adjusted = round_up_to_valid_progression(
                 optimized_weight,
                 next_total_weight,

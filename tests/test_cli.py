@@ -275,7 +275,7 @@ def test_prompt_one_rm(monkeypatch, capsys):
 
     out = capsys.readouterr().out
     assert "Estimated 1RM" in out
-    # With Epley & rounding you’ve been using: 275 * (1 + 5/30) = 275 * 7/6 ≈ 321
+    # With Epley & rounding you've been using: 275 * (1 + 5/30) = 275 * 7/6 ≈ 321
     assert "321" in out
 
 
@@ -589,148 +589,33 @@ def test_interactive_template_classic_builds_expected_lifts(
     captured = no_side_effects
 
     # Inputs sequence:
-    # 1. title (blank -> default)
-    # 2. template = "1"
-    # 3. squat 1RM
-    # 4. bench 1RM
-    # 5. deadlift 1RM
-    # 6. WPU bodyweight (blank -> skip)
-    # 7. week (blank -> all)
-    # 8. output mode "t" (text only)
+    # 1.  title (blank -> default)
+    # 2.  template = "1"
+    # 3.  squat 1RM
+    # 4.  squat bar weight (blank -> 45)
+    # 5.  squat bar label (blank -> none)
+    # 6.  bench 1RM
+    # 7.  bench bar weight (blank -> 45)
+    # 8.  bench bar label (blank -> none)
+    # 9.  deadlift 1RM
+    # 10. deadlift bar weight (blank -> 45)
+    # 11. deadlift bar label (blank -> none)
+    # 12. WPU bodyweight (blank -> skip)
+    # 13. week (blank -> all)
+    # 14. output mode "t" (text only)
     inputs = iter(
         [
             "",  # title
             "1",  # template choice -> Classic
-            "455",  # squat
-            "315",  # bench
-            "500",  # deadlift
-            "",  # WPU bodyweight skip
-            "",  # week -> "all"
-            "t",  # output mode
-        ]
-    )
-
-    def fake_input(prompt: str = "") -> str:
-        return next(inputs)
-
-    monkeypatch.setattr(cli, "input", fake_input)
-
-    cli.run_interactive()
-
-    args = captured["args"]
-    lifts = args.lifts
-
-    assert lifts["squat"]["one_rm"] == 455
-    assert lifts["bench press"]["one_rm"] == 315
-    assert lifts["deadlift"]["one_rm"] == 500
-    # No WPU because we skipped BW
-    assert "weighted pullup" not in lifts
-
-
-def test_interactive_template_front_squat_block_builds_expected_lifts(
-    monkeypatch, no_side_effects
-):
-    """
-    Template 2: Front-squat Block – Front Squat / Overhead Press / Deadlift / (optional) WPU
-    """
-    captured = no_side_effects
-
-    inputs = iter(
-        [
-            "FS Block",  # title
-            "2",  # template choice -> Front-squat Block
-            "355",  # front squat
-            "185",  # overhead press
-            "495",  # deadlift
-            "200",  # WPU bodyweight
-            "35x4",  # WPU set
-            "3",  # week = 3
-            "t",  # output mode
-        ]
-    )
-
-    def fake_input(prompt: str = "") -> str:
-        return next(inputs)
-
-    monkeypatch.setattr(cli, "input", fake_input)
-
-    cli.run_interactive()
-
-    args = captured["args"]
-    lifts = args.lifts
-
-    assert "squat" not in lifts
-    assert "bench press" not in lifts
-    assert lifts["front squat"]["one_rm"] == 355
-    assert lifts["overhead press"]["one_rm"] == 185
-    assert lifts["deadlift"]["one_rm"] == 495
-    # WPU should be present with estimated 1RM and given BW
-    assert "weighted pullup" in lifts
-    assert lifts["weighted pullup"]["body_weight"] == 200
-
-
-# -------------------------------------------------------------------
-# Fixtures + tests for interactive templates (run_interactive)
-# -------------------------------------------------------------------
-
-
-@pytest.fixture
-def no_side_effects(monkeypatch):
-    """
-    Disable clipboard + PDF side effects, and capture args passed into
-    build_program_markdown for inspection.
-    """
-    captured = {}
-
-    def fake_copy_to_clipboard(_text: str) -> None:
-        return
-
-    def fake_markdown_to_pdf(_md: str, _path: str, title: str | None = None) -> None:
-        return
-
-    def fake_build_program_markdown(
-        args: argparse.Namespace, for_pdf: bool = False
-    ) -> str:
-        captured["args"] = args
-        return "# TEST PROGRAM"
-
-    monkeypatch.setattr(cli, "copy_to_clipboard", fake_copy_to_clipboard)
-    monkeypatch.setattr(cli, "markdown_to_pdf", fake_markdown_to_pdf)
-    monkeypatch.setattr(cli, "build_program_markdown", fake_build_program_markdown)
-
-    return captured
-
-
-def test_interactive_template_classic_builds_expected_lifts(
-    monkeypatch, no_side_effects
-):
-    """
-    Template 1: Classic – Squat / Bench / Deadlift / (optional) WPU
-    """
-    captured = no_side_effects
-
-    # Inputs sequence:
-    # 1. title (blank -> default)
-    # 2. template = "1"
-    # 3. squat 1RM
-    # 4. squat bar weight (blank -> 45)
-    # 5. bench 1RM
-    # 6. bench bar weight (blank -> 45)
-    # 7. deadlift 1RM
-    # 8. deadlift bar weight (blank -> 45)
-    # 9. WPU bodyweight (blank -> skip)
-    # 10. week (blank -> all)
-    # 11. output mode "t" (text only)
-    inputs = iter(
-        [
-            "",  # title
-            "1",  # template choice -> Classic
-            "455",  # squat
+            "455",  # squat 1RM
             "",  # squat bar weight -> default 45
-            "315",  # bench
+            "",  # squat bar label -> none
+            "315",  # bench 1RM
             "",  # bench bar weight -> default 45
-            "500",  # deadlift
+            "",  # bench bar label -> none
+            "500",  # deadlift 1RM
             "",  # deadlift bar weight -> default 45
+            "",  # deadlift bar label -> none
             "",  # WPU bodyweight skip
             "",  # week -> "all"
             "t",  # output mode
@@ -740,13 +625,12 @@ def test_interactive_template_classic_builds_expected_lifts(
     def fake_input(prompt: str = "") -> str:
         return next(inputs)
 
-    # ✅ patch builtins.input, not cli.input
     monkeypatch.setattr(builtins, "input", fake_input)
 
     cli.run_interactive()
 
     args = captured["args"]
-    lifts = args.lifts
+    lifts = {l["exercise"]: l for l in args.lifts}
 
     assert lifts["squat"]["one_rm"] == 455
     assert lifts["bench press"]["one_rm"] == 315
@@ -767,12 +651,15 @@ def test_interactive_template_front_squat_block_builds_expected_lifts(
         [
             "FS Block",  # title
             "2",  # template choice -> Front-squat Block
-            "355",  # front squat
+            "355",  # front squat 1RM
             "",  # front squat bar weight -> default 45
-            "185",  # overhead press
+            "",  # front squat bar label -> none
+            "185",  # overhead press 1RM
             "",  # overhead press bar weight -> default 45
-            "495",  # deadlift
+            "",  # overhead press bar label -> none
+            "495",  # deadlift 1RM
             "",  # deadlift bar weight -> default 45
+            "",  # deadlift bar label -> none
             "200",  # WPU bodyweight
             "35x4",  # WPU set
             "3",  # week = 3
@@ -783,13 +670,12 @@ def test_interactive_template_front_squat_block_builds_expected_lifts(
     def fake_input(prompt: str = "") -> str:
         return next(inputs)
 
-    # ✅ patch builtins.input here too
     monkeypatch.setattr(builtins, "input", fake_input)
 
     cli.run_interactive()
 
     args = captured["args"]
-    lifts = args.lifts
+    lifts = {l["exercise"]: l for l in args.lifts}
 
     assert "squat" not in lifts
     assert "bench press" not in lifts
@@ -817,24 +703,29 @@ def test_interactive_template_custom_with_extra_exercises(
             "1",  # choose squat
             "455",  # squat 1RM
             "",  # squat bar weight -> default 45
+            "",  # squat bar label -> none
             # Upper-body main press slot
             "1",  # choose bench press
             "315",  # bench 1RM
             "",  # bench bar weight -> default 45
+            "",  # bench bar label -> none
             # Hinge slot
             "1",  # choose deadlift
             "500",  # deadlift 1RM
             "",  # deadlift bar weight -> default 45
+            "",  # deadlift bar label -> none
             "",  # WPU bodyweight skip
             # Extra exercises
             "y",  # add extra exercises? yes
             "5",  # select overhead press (5th in EXERCISE_PROFILES keys alphabetically)
             "185",  # overhead press 1RM
             "",  # overhead press bar weight -> default 45
+            "",  # overhead press bar label -> none
             "y",  # add another? yes
             "2",  # select front squat (2nd in EXERCISE_PROFILES keys alphabetically)
             "355",  # front squat 1RM
             "",  # front squat bar weight -> default 45
+            "",  # front squat bar label -> none
             "n",  # add another? no
             "",  # week -> "all"
             "t",  # output mode
@@ -849,7 +740,7 @@ def test_interactive_template_custom_with_extra_exercises(
     cli.run_interactive()
 
     args = captured["args"]
-    lifts = args.lifts
+    lifts = {l["exercise"]: l for l in args.lifts}
 
     # Standard slot selections
     assert lifts["squat"]["one_rm"] == 455

@@ -1,4 +1,4 @@
-"""Tests for linear warmup progression functionality."""
+"""Tests for warmup progression functionality."""
 
 from tbweightcalc.exercise_set import (
     get_plate_list,
@@ -143,74 +143,108 @@ class TestEnsureLinearWarmupProgression:
             assert is_linear, f"{all_weights[i]} -> {all_weights[i+1]} not linear"
 
 
-class TestExerciseClusterLinearProgression:
-    """Integration tests for linear warmup progression in exercise clusters."""
+class TestExerciseClusterWarmupQuality:
+    """Integration tests verifying warmup quality: no duplicates, monotonic increase, reasonable weights."""
 
-    def test_squat_linear_progression(self):
-        """Test squat warmup progression is linear."""
-        cluster = ExerciseCluster(week=1, exercise="squat", oneRepMax=455, bar_weight=45.0)
-
-        # Check all warmups form linear progression to working weight
-        weights = [s.weight for s in cluster.sets]
-
-        for i in range(len(weights) - 1):
-            curr_plates = get_plate_list(weights[i], 45)
-            next_plates = get_plate_list(weights[i + 1], 45)
-            is_linear = plates_are_subset(curr_plates, next_plates)
-            assert is_linear, f"Squat: {weights[i]} -> {weights[i+1]} not linear"
-
-    def test_deadlift_linear_progression(self):
-        """Test deadlift warmup progression is linear."""
-        cluster = ExerciseCluster(week=1, exercise="deadlift", oneRepMax=300, bar_weight=45.0)
-
-        weights = [s.weight for s in cluster.sets]
-
-        for i in range(len(weights) - 1):
-            curr_plates = get_plate_list(weights[i], 45)
-            next_plates = get_plate_list(weights[i + 1], 45)
-            is_linear = plates_are_subset(curr_plates, next_plates)
-            assert is_linear, f"Deadlift: {weights[i]} -> {weights[i+1]} not linear"
-
-    def test_bench_linear_progression(self):
-        """Test bench press warmup progression is linear."""
-        cluster = ExerciseCluster(week=1, exercise="bench press", oneRepMax=250, bar_weight=45.0)
-
-        weights = [s.weight for s in cluster.sets]
-
-        for i in range(len(weights) - 1):
-            curr_plates = get_plate_list(weights[i], 45)
-            next_plates = get_plate_list(weights[i + 1], 45)
-            is_linear = plates_are_subset(curr_plates, next_plates)
-            assert is_linear, f"Bench: {weights[i]} -> {weights[i+1]} not linear"
-
-    def test_heavy_squat_week_3(self):
-        """Test heavy squat at week 3 (90%) maintains linear progression."""
-        cluster = ExerciseCluster(week=3, exercise="squat", oneRepMax=455, bar_weight=45.0)
-
-        weights = [s.weight for s in cluster.sets]
-
-        for i in range(len(weights) - 1):
-            curr_plates = get_plate_list(weights[i], 45)
-            next_plates = get_plate_list(weights[i + 1], 45)
-            is_linear = plates_are_subset(curr_plates, next_plates)
-            assert is_linear, f"Heavy squat: {weights[i]} -> {weights[i+1]} not linear"
-
-    def test_no_warmup_plate_removal(self):
-        """Verify that no warmup requires removing plates."""
-        exercises = [
-            ("squat", 455),
-            ("bench press", 250),
-            ("deadlift", 300),
-            ("overhead press", 155),
+    def test_no_duplicate_warmup_weights(self):
+        """Warmup sets should not have duplicate weights for any non-bar set."""
+        cases = [
+            ("bench press", 283, 1),
+            ("bench press", 283, 2),
+            ("bench press", 250, 1),
+            ("squat", 283, 1),
+            ("squat", 455, 1),
+            ("deadlift", 300, 1),
         ]
+        for exercise, one_rm, week in cases:
+            cluster = ExerciseCluster(week=week, exercise=exercise, oneRepMax=one_rm, bar_weight=45.0)
+            warmup_weights = [s.weight for s in cluster.sets[:-1]]
+            non_bar = [w for w in warmup_weights if w > 45]
+            assert len(non_bar) == len(set(non_bar)), (
+                f"{exercise} {one_rm} week {week}: duplicate warmup weights {warmup_weights}"
+            )
 
-        for exercise, one_rm in exercises:
-            for week in [1, 2, 3, 4, 5, 6]:
-                cluster = ExerciseCluster(week=week, exercise=exercise, oneRepMax=one_rm, bar_weight=45.0)
-                weights = [s.weight for s in cluster.sets]
+    def test_warmup_weights_monotonically_increasing(self):
+        """All sets (warmups + working) must be non-decreasing in weight."""
+        cases = [
+            ("bench press", 283, 1),
+            ("bench press", 283, 2),
+            ("bench press", 250, 1),
+            ("squat", 455, 1),
+            ("squat", 455, 3),
+            ("deadlift", 300, 1),
+            ("overhead press", 155, 1),
+        ]
+        for exercise, one_rm, week in cases:
+            cluster = ExerciseCluster(week=week, exercise=exercise, oneRepMax=one_rm, bar_weight=45.0)
+            weights = [s.weight for s in cluster.sets]
+            for i in range(len(weights) - 1):
+                assert weights[i] <= weights[i + 1], (
+                    f"{exercise} {one_rm} week {week}: decreasing at {i}: "
+                    f"{weights[i]} -> {weights[i + 1]}"
+                )
 
-                for i in range(len(weights) - 1):
-                    curr_plates = get_plate_list(weights[i], 45)
-                    next_plates = get_plate_list(weights[i + 1], 45)
-                    is_linear = plates_are_subset(curr_plates, next_plates)
-                    assert is_linear, f"{exercise} week {week}: {weights[i]} -> {weights[i+1]} requires plate removal"
+    def test_bench_283_week1_warmup_weights(self):
+        """Bench 283 week 1 warmup weights should be close to multiplier targets with no duplicates."""
+        cluster = ExerciseCluster(week=1, exercise="bench press", oneRepMax=283, bar_weight=45.0)
+        weights = [s.weight for s in cluster.sets]
+
+        assert weights[-1] == 200, f"Expected working weight 200, got {weights[-1]}"
+        assert len(cluster.sets) == 5
+
+        # 0.5 warmup: target = 100. Should be 90–120.
+        assert 90 <= weights[1] <= 120, f"0.5 warmup out of range: {weights[1]}"
+        # 0.7 warmup: target = 140. Should be 120–160.
+        assert 120 <= weights[2] <= 160, f"0.7 warmup out of range: {weights[2]}"
+        # 0.9 warmup: target = 180. Should be 165–195.
+        assert 165 <= weights[3] <= 195, f"0.9 warmup out of range: {weights[3]}"
+
+        # No duplicate non-bar warmup weights
+        non_bar = [w for w in weights[:-1] if w > 45]
+        assert len(non_bar) == len(set(non_bar)), f"Duplicate warmup weights: {weights}"
+
+    def test_bench_283_week2_warmup_weights(self):
+        """Bench 283 week 2 warmup weights should be reasonable with no duplicates."""
+        cluster = ExerciseCluster(week=2, exercise="bench press", oneRepMax=283, bar_weight=45.0)
+        weights = [s.weight for s in cluster.sets]
+
+        assert weights[-1] == 225, f"Expected working weight 225, got {weights[-1]}"
+
+        # No duplicate non-bar warmup weights (the key fix for the reported bug)
+        non_bar = [w for w in weights[:-1] if w > 45]
+        assert len(non_bar) == len(set(non_bar)), f"Duplicate warmup weights: {weights}"
+
+        # 0.9 warmup should not equal the working weight
+        assert weights[3] < weights[4], f"Last warmup equals working weight: {weights}"
+
+    def test_bench_250_week1_warmup_weights(self):
+        """Bench 250 week 1 should produce warmups in reasonable ranges (README baseline)."""
+        cluster = ExerciseCluster(week=1, exercise="bench press", oneRepMax=250, bar_weight=45.0)
+        weights = [s.weight for s in cluster.sets]
+
+        assert weights[-1] == 175, f"Expected working weight 175, got {weights[-1]}"
+
+        # 0.5 warmup: target 87.5 → ~90. Should be 80–110.
+        assert 80 <= weights[1] <= 110, f"0.5 warmup out of range: {weights[1]}"
+        # 0.7 warmup: target 122.5 → ~120–135. Should be 110–145.
+        assert 110 <= weights[2] <= 145, f"0.7 warmup out of range: {weights[2]}"
+        # 0.9 warmup: target 157.5 → ~160–165. Should be 150–175.
+        assert 150 <= weights[3] <= 175, f"0.9 warmup out of range: {weights[3]}"
+
+    def test_no_warmup_equals_working_weight(self):
+        """No warmup set should equal the working weight."""
+        cases = [
+            ("bench press", 283, 1),
+            ("bench press", 283, 2),
+            ("bench press", 250, 1),
+            ("squat", 455, 1),
+            ("deadlift", 300, 1),
+        ]
+        for exercise, one_rm, week in cases:
+            cluster = ExerciseCluster(week=week, exercise=exercise, oneRepMax=one_rm, bar_weight=45.0)
+            weights = [s.weight for s in cluster.sets]
+            working = weights[-1]
+            warmups = weights[:-1]
+            assert all(w < working for w in warmups), (
+                f"{exercise} {one_rm} week {week}: warmup equals working weight {working}: {weights}"
+            )
