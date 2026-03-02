@@ -687,18 +687,62 @@ def test_interactive_template_front_squat_block_builds_expected_lifts(
     assert lifts["weighted pullup"]["body_weight"] == 200
 
 
+def test_interactive_template_zercher_block_builds_expected_lifts(
+    monkeypatch, no_side_effects
+):
+    """
+    Template 3: Zercher Block – Zercher Squat / Bench Press / Deadlift / (optional) WPU
+    """
+    captured = no_side_effects
+
+    inputs = iter(
+        [
+            "Zercher Block",  # title
+            "3",  # template choice -> Zercher Block
+            "315",  # zercher squat 1RM
+            "",  # zercher squat bar weight -> default 45
+            "",  # zercher squat bar label -> none
+            "225",  # bench press 1RM
+            "",  # bench press bar weight -> default 45
+            "",  # bench press bar label -> none
+            "405",  # deadlift 1RM
+            "",  # deadlift bar weight -> default 45
+            "",  # deadlift bar label -> none
+            "",  # WPU bodyweight skip
+            "",  # week -> "all"
+            "t",  # output mode
+        ]
+    )
+
+    def fake_input(prompt: str = "") -> str:
+        return next(inputs)
+
+    monkeypatch.setattr(builtins, "input", fake_input)
+
+    cli.run_interactive()
+
+    args = captured["args"]
+    lifts = {l["exercise"]: l for l in args.lifts}
+
+    assert "squat" not in lifts
+    assert lifts["zercher squat"]["one_rm"] == 315
+    assert lifts["bench press"]["one_rm"] == 225
+    assert lifts["deadlift"]["one_rm"] == 405
+    assert "weighted pullup" not in lifts
+
+
 def test_interactive_template_custom_with_extra_exercises(
     monkeypatch, no_side_effects
 ):
     """
-    Template 3: Custom with extra exercises added
+    Template 4: Custom with extra exercises added
     """
     captured = no_side_effects
 
     inputs = iter(
         [
             "Custom Program",  # title
-            "3",  # template choice -> Custom
+            "4",  # template choice -> Custom
             # Lower-body main lift slot
             "1",  # choose squat
             "455",  # squat 1RM
