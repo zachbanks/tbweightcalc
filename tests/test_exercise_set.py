@@ -92,17 +92,23 @@ class TestExerciseSet(unittest.TestCase):
         def test_calc_weighted_pullup(self):
             s = ExerciseSet(bar=False)
 
-            # Weight should = working weight * multiplier - bodyweight
+            # Weight = round((total_1rm - bw) * multiplier)
+            # added_1rm = 260 - 200 = 60
             s.calc_weighted_pullup(260, 200, 1.0)
-            self.assertEqual(s.weight, 60)
+            self.assertEqual(s.weight, 60)   # round(60 * 1.0) = 60
             self.assertEqual(s.plate_breakdown, "45 15")
 
             s.calc_weighted_pullup(260, 200, 0.90)
-            self.assertEqual(s.weight, 34)
-            self.assertEqual(s.plate_breakdown, "35")
+            self.assertEqual(s.weight, 55)   # round(60 * 0.90) = round(54) = 55
+            self.assertEqual(s.plate_breakdown, "45 10")
 
-            # If weight returns negative => 0
+            # 60 * 0.75 = 45 -> not negative, shows as 45#
             s.calc_weighted_pullup(260, 200, 0.75)
+            self.assertEqual(s.weight, 45)
+            self.assertEqual(s.plate_breakdown, "45")
+
+            # If BW >= total weight, added is negative => Bodyweight
+            s.calc_weighted_pullup(200, 200, 1.0)
             self.assertEqual(s.weight, 0)
             self.assertEqual(s.plate_breakdown, "Bodyweight")
 

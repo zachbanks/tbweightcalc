@@ -127,7 +127,7 @@ class ExerciseSet:
             self.weight = w
 
     def calc_weighted_pullup(self, working_weight, body_weight, multiplier):
-        calc_weight = (working_weight * multiplier) - body_weight
+        calc_weight = ExerciseSet.round_weight((working_weight - body_weight) * multiplier)
         if calc_weight <= 0:
             self.weight = 0
         else:

@@ -52,33 +52,32 @@ class TestExerciseCluster(unittest.TestCase):
             "Expected a (1-3) x 3 set with 360 in deadlift cluster output.",
         )
 
-        # ----- Weighted pull-ups: week 1, low load -> bodyweight only -----
+        # ----- Weighted pull-ups: week 1, % applied to added weight -> shows added weight -----
+        # added_1rm = 240 - 180 = 60; 60 * 0.70 = 42 -> round to 40#
         c = ExerciseCluster(
             week=1, exercise=ExerciseCluster.WPU, oneRepMax=240, body_weight=180
         )
         out = str(c).strip()
-
-        # For low loads we expect just bodyweight text, no plate breakdown
-        self.assertIn("Bodyweight", out)
+        self.assertIn("40", out)
+        self.assertNotIn("Bodyweight", out)
 
         # ----- Weighted pull-ups: week 3, heavier load -> show added weight -----
+        # 60 * 0.90 = 54 -> round to 55# = "45 10"
         c = ExerciseCluster(
             week=3, exercise=ExerciseCluster.WPU, oneRepMax=240, body_weight=180
         )
         out = str(c).strip()
-        # Should show the added weight (here 35) in some form
-        self.assertIn("35", out)
+        self.assertIn("55", out)
+        self.assertIn("45 10", out)
 
         # ----- Weighted pull-ups: week 6, heavier again -> show plates, not bar -----
+        # added_1rm = 300 - 180 = 120; 120 * 0.95 = 114 -> round to 115# = "(45 x 2) 25"
         c = ExerciseCluster(
             week=6, exercise=ExerciseCluster.WPU, oneRepMax=300, body_weight=180
         )
         out = str(c).strip()
-
-        # Should show the added weight (around 105) somewhere
-        self.assertIn("105", out)
-        # Should show some plate breakdown (e.g. (45 x 2)), but not say "Bar"
-        self.assertIn("45", out)
+        self.assertIn("115", out)
+        self.assertIn("(45 x 2) 25", out)
         self.assertNotIn(
             "Bar", out, msg="WPU should not include bar weight in description."
         )

@@ -339,9 +339,9 @@ class ExerciseCluster:
             elif kind == "wpu":
                 s.bar = False
                 s.calc_weighted_pullup(
-                    self.working_weight,
+                    self.oneRepMax,
                     self.body_weight,
-                    d["multiplier"],
+                    d["multiplier"] * self.week_multiplier,
                 )
                 # Plate breakdown only when total weight > 45#
                 s.plate_breakdown_on = s.weight > 45
