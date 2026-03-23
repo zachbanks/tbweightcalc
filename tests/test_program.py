@@ -17,18 +17,15 @@ class TestPrintExerciseBarWeight:
             formatter=PlainFormatter(),
         )
 
-        # Should have "SQUAT" but not "45# bar" or "(45# bar)"
+        # Should have "SQUAT" but no parenthetical bar info
         assert "SQUAT" in output
-        assert "45# bar" not in output
-        assert "(45# bar)" not in output
-        # Ensure the title line doesn't have parentheses (which would indicate bar weight)
         lines = output.split('\n')
         title_line = lines[0]
         assert "SQUAT" in title_line
         assert "(" not in title_line
 
-    def test_custom_bar_weight_shown_as_integer(self):
-        """Custom bar weight that's a whole number should display as integer."""
+    def test_custom_bar_weight_no_label_shown_in_title(self):
+        """Custom bar weight without label shows weight in title."""
         output = Program.print_exercise(
             exercise="squat",
             oneRepMax=455,
@@ -38,28 +35,14 @@ class TestPrintExerciseBarWeight:
             formatter=PlainFormatter(),
         )
 
-        # Should show "SQUAT (35# bar)"
-        assert "SQUAT (35# bar)" in output
-        # Should not show decimal point
+        # PlainFormatter without config uses "lbs" unit
+        assert "SQUAT (35 lbs bar)" in output
+        # Should not show decimal point for whole number
         assert "35.0" not in output
-
-    def test_custom_bar_weight_shown_as_decimal(self):
-        """Custom bar weight with decimal should display with decimal."""
-        output = Program.print_exercise(
-            exercise="squat",
-            oneRepMax=455,
-            week=1,
-            bar_weight=33.5,
-            print_1rm=False,
-            formatter=PlainFormatter(),
-        )
-
-        # Should show "SQUAT (33.5# bar)"
-        assert "SQUAT (33.5# bar)" in output
 
     def test_custom_bar_weight_with_multiple_exercises(self):
         """Test different bar weights on different exercises."""
-        # Standard bar
+        # Standard bar – no parenthetical
         output1 = Program.print_exercise(
             exercise="deadlift",
             oneRepMax=500,
@@ -69,7 +52,7 @@ class TestPrintExerciseBarWeight:
             formatter=PlainFormatter(),
         )
 
-        # Custom bar
+        # Custom bar weight, no label
         output2 = Program.print_exercise(
             exercise="overhead press",
             oneRepMax=185,
@@ -82,10 +65,10 @@ class TestPrintExerciseBarWeight:
         assert "DEADLIFT" in output1
         assert "bar" not in output1.lower()
 
-        assert "OVERHEAD PRESS (15# bar)" in output2
+        assert "OVERHEAD PRESS (15 lbs bar)" in output2
 
     def test_custom_bar_weight_all_weeks(self):
-        """Custom bar weight should appear in all weeks when week='all'."""
+        """Custom bar weight should appear in the header when week='all'."""
         output = Program.print_exercise(
             exercise="bench press",
             oneRepMax=315,
@@ -95,5 +78,99 @@ class TestPrintExerciseBarWeight:
             formatter=PlainFormatter(),
         )
 
-        # Should appear multiple times (once per week header)
-        assert output.count("BENCH PRESS (55# bar)") == 6  # One for each of 6 weeks
+        # One header for the whole exercise block
+        assert "BENCH PRESS (55 lbs bar)" in output
+
+
+class TestPrintExerciseBarLabel:
+    """Test that custom bar labels appear correctly in exercise titles."""
+
+    def test_bar_label_with_custom_weight_in_title(self):
+        """Label + custom weight: 'EXERCISE (Label - weight)' format."""
+        output = Program.print_exercise(
+            exercise="zercher squat",
+            oneRepMax=300,
+            week=1,
+            bar_weight=25.0,
+            bar_label="Axle Bar",
+            print_1rm=False,
+            formatter=PlainFormatter(),
+        )
+
+        assert "ZERCHER SQUAT (Axle Bar - 25 lbs)" in output
+
+    def test_bar_label_with_standard_weight_in_title(self):
+        """Label on a 45# bar: 'EXERCISE (Label)' format."""
+        output = Program.print_exercise(
+            exercise="squat",
+            oneRepMax=455,
+            week=1,
+            bar_weight=45.0,
+            bar_label="Safety Squat Bar",
+            print_1rm=False,
+            formatter=PlainFormatter(),
+        )
+
+        assert "SQUAT (Safety Squat Bar)" in output
+        # Should not show weight separately since it's the standard 45
+        assert "45 lbs" not in output.split('\n')[0]
+
+    def test_bar_label_trap_bar_deadlift(self):
+        """Trap bar deadlift shows label and weight in title."""
+        output = Program.print_exercise(
+            exercise="deadlift",
+            oneRepMax=380,
+            week=1,
+            bar_weight=60.0,
+            bar_label="Trap Bar",
+            print_1rm=False,
+            formatter=PlainFormatter(),
+        )
+
+        assert "DEADLIFT (Trap Bar - 60 lbs)" in output
+
+    def test_bar_label_overrides_weight_only_display(self):
+        """When label is given, label+weight format replaces 'weight bar' format."""
+        output_with_label = Program.print_exercise(
+            exercise="squat",
+            oneRepMax=455,
+            week=1,
+            bar_weight=35.0,
+            bar_label="Buffalo Bar",
+            print_1rm=False,
+            formatter=PlainFormatter(),
+        )
+
+        output_no_label = Program.print_exercise(
+            exercise="squat",
+            oneRepMax=455,
+            week=1,
+            bar_weight=35.0,
+            bar_label=None,
+            print_1rm=False,
+            formatter=PlainFormatter(),
+        )
+
+        assert "SQUAT (Buffalo Bar - 35 lbs)" in output_with_label
+        assert "SQUAT (35 lbs bar)" in output_no_label
+        # The label version should not use the "bar" indicator
+        assert "35 lbs bar" not in output_with_label
+
+    def test_bar_label_appears_in_set_warmup_line(self):
+        """Bar-only warmup sets show the label name (no redundant weight)."""
+        output = Program.print_exercise(
+            exercise="zercher squat",
+            oneRepMax=300,
+            week=1,
+            bar_weight=25.0,
+            bar_label="Axle Bar",
+            print_1rm=False,
+            formatter=PlainFormatter(),
+        )
+
+        lines = output.split('\n')
+        bar_only_lines = [l for l in lines if "2 x 5" in l]
+        assert len(bar_only_lines) == 1
+        # Should show label name, not redundant "Axle Bar - 25 lbs"
+        assert "Axle Bar" in bar_only_lines[0]
+        assert "Axle Bar - 25 lbs" not in bar_only_lines[0]

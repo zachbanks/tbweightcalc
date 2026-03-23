@@ -175,10 +175,7 @@ class ExerciseSet:
             final_string = "Bodyweight"
         elif self.bar == True and corrected_weight <= self.bar_weight:
             # Use custom label if provided, otherwise default to "Bar"
-            if self.bar_label:
-                final_string = f"{self.bar_label} - {int(self.bar_weight)} lbs"
-            else:
-                final_string = "Bar"
+            final_string = self.bar_label if self.bar_label else "Bar"
 
         return final_string.strip()
 

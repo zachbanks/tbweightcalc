@@ -341,13 +341,13 @@ def test_bar_label_in_exercise_cluster():
     assert first_set.bar_weight == 55.0
     assert first_set.bar_label == "Safety Squat Bar"
 
-    # First set is bar-only, so plate breakdown should show label
+    # First set is bar-only, so plate breakdown should show just the label name
     assert first_set.weight == 55.0
-    assert first_set.plate_breakdown == "Safety Squat Bar - 55 lbs"
+    assert first_set.plate_breakdown == "Safety Squat Bar"
 
     # Check that it appears in the rendered output
     output = str(c)
-    assert "Safety Squat Bar - 55 lbs" in output
+    assert "Safety Squat Bar" in output
 
 
 def test_bar_label_without_label():

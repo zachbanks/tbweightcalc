@@ -181,13 +181,13 @@ class TestExerciseSet(unittest.TestCase):
             self.assertNotIn("(45 x 2)", out)
 
         def test_bar_label_with_bar_only_weight(self):
-            # Test that bar label appears when weight is bar-only (45 lbs)
+            # Bar-only sets show just the label name (no redundant weight)
             s = ExerciseSet(weight=45, bar_weight=45, bar_label="Safety Squat Bar")
-            self.assertEqual(s.plate_breakdown, "Safety Squat Bar - 45 lbs")
+            self.assertEqual(s.plate_breakdown, "Safety Squat Bar")
 
             # Test with different bar weight
             s = ExerciseSet(weight=55, bar_weight=55, bar_label="Trap Bar")
-            self.assertEqual(s.plate_breakdown, "Trap Bar - 55 lbs")
+            self.assertEqual(s.plate_breakdown, "Trap Bar")
 
         def test_bar_label_without_label(self):
             # Test that default "Bar" is shown when no label is provided
