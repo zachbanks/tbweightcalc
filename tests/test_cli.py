@@ -368,6 +368,68 @@ class TestParseOneRmString:
 
 
 # -------------------------------------------------------------------
+# Tests for math expression support in parse_one_rm_string
+# -------------------------------------------------------------------
+
+
+class TestMathExpressions:
+    def test_percentage_addition(self):
+        # 240 + 10% -> 240 + 24 = 264
+        assert cli.parse_one_rm_string("240 + 10%") == 264
+        assert cli.parse_one_rm_string("240+10%") == 264
+        assert cli.parse_one_rm_string("240 +10%") == 264
+        assert cli.parse_one_rm_string("240+ 10%") == 264
+
+    def test_percentage_subtraction(self):
+        # 240 - 5% -> 240 - 12 = 228
+        assert cli.parse_one_rm_string("240 - 5%") == 228
+        assert cli.parse_one_rm_string("240-5%") == 228
+        assert cli.parse_one_rm_string("240 -5%") == 228
+        assert cli.parse_one_rm_string("240- 5%") == 228
+
+    def test_absolute_addition(self):
+        # 380 + 5 -> 385
+        assert cli.parse_one_rm_string("380 + 5") == 385
+        assert cli.parse_one_rm_string("380+5") == 385
+        # with lbs suffix
+        assert cli.parse_one_rm_string("240 + 20 lbs") == 260
+        assert cli.parse_one_rm_string("240+20lbs") == 260
+        assert cli.parse_one_rm_string("240 + 20 lb") == 260
+
+    def test_absolute_subtraction(self):
+        # 380 - 10 -> 370
+        assert cli.parse_one_rm_string("380 - 10") == 370
+        assert cli.parse_one_rm_string("380-10") == 370
+        # with lbs suffix
+        assert cli.parse_one_rm_string("240 - 10 lbs") == 230
+        assert cli.parse_one_rm_string("240-10lbs") == 230
+        assert cli.parse_one_rm_string("240 - 10 lb") == 230
+
+    def test_percentage_subtraction_deload(self):
+        # 380 - 10% -> 380 * 0.10 = 38; 380 - 38 = 342
+        assert cli.parse_one_rm_string("380 - 10%") == 342
+
+    def test_decimal_base_and_adjustment(self):
+        # 240.5 + 10% -> 240.5 + 24.05 = 264.55 -> 265
+        assert cli.parse_one_rm_string("240.5 + 10%") == 265
+        # 240 + 5.5 -> 245.5 -> 246
+        assert cli.parse_one_rm_string("240 + 5.5") == 246
+        # 240 - 2.3% -> 240 - 5.52 = 234.48 -> 234
+        assert cli.parse_one_rm_string("240 - 2.3%") == 234
+
+    def test_edge_cases(self):
+        assert cli.parse_one_rm_string("200 + 50%") == 300
+        assert cli.parse_one_rm_string("100 + 1%") == 101
+        assert cli.parse_one_rm_string("300 - 100") == 200
+
+    def test_evaluate_weight_expression_directly(self):
+        assert cli.evaluate_weight_expression(240, "+ 10%") == 264.0
+        assert cli.evaluate_weight_expression(240, "- 5%") == 228.0
+        assert cli.evaluate_weight_expression(240, "+ 20") == 260.0
+        assert cli.evaluate_weight_expression(240, "- 10 lbs") == 230.0
+
+
+# -------------------------------------------------------------------
 # Tests for parse_weighted_pullup_string + interactive WPU helper
 # -------------------------------------------------------------------
 
