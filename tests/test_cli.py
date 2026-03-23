@@ -679,6 +679,7 @@ def test_interactive_template_classic_builds_expected_lifts(
             "",  # deadlift bar weight -> default 45
             "",  # deadlift bar label -> none
             "",  # WPU bodyweight skip
+            "c",  # review -> continue without changes
             "",  # week -> "all"
             "t",  # output mode
         ]
@@ -724,6 +725,7 @@ def test_interactive_template_front_squat_block_builds_expected_lifts(
             "",  # deadlift bar label -> none
             "200",  # WPU bodyweight
             "35x4",  # WPU set
+            "c",  # review -> continue without changes
             "3",  # week = 3
             "t",  # output mode
         ]
@@ -771,6 +773,7 @@ def test_interactive_template_zercher_block_builds_expected_lifts(
             "",  # deadlift bar weight -> default 45
             "",  # deadlift bar label -> none
             "",  # WPU bodyweight skip
+            "c",  # review -> continue without changes
             "",  # week -> "all"
             "t",  # output mode
         ]
@@ -833,6 +836,7 @@ def test_interactive_template_custom_with_extra_exercises(
             "",  # front squat bar weight -> default 45
             "",  # front squat bar label -> none
             "n",  # add another? no
+            "c",  # review -> continue without changes
             "",  # week -> "all"
             "t",  # output mode
         ]
@@ -859,3 +863,193 @@ def test_interactive_template_custom_with_extra_exercises(
     assert lifts["front squat"]["one_rm"] == 355
     # No WPU because we skipped BW
     assert "weighted pullup" not in lifts
+
+
+# -------------------------------------------------------------------
+# Tests for _review_and_edit_lifts  (review/edit step)
+# -------------------------------------------------------------------
+
+
+class TestReviewAndEditLifts:
+    """Unit tests for the _review_and_edit_lifts helper."""
+
+    def _make_lifts(self):
+        return [
+            {"exercise": "squat",      "one_rm": 455, "body_weight": None, "bar_weight": 45.0, "bar_label": None},
+            {"exercise": "bench press","one_rm": 275, "body_weight": None, "bar_weight": 45.0, "bar_label": None},
+            {"exercise": "deadlift",   "one_rm": 380, "body_weight": None, "bar_weight": 45.0, "bar_label": None},
+        ]
+
+    def test_continue_immediately_returns_lifts_unchanged(self, monkeypatch):
+        """Typing 'c' on first prompt returns the lifts unmodified."""
+        lifts = self._make_lifts()
+        inputs = iter(["c"])
+        monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+
+        result = cli._review_and_edit_lifts(lifts)
+
+        assert result[0]["one_rm"] == 455
+        assert result[1]["one_rm"] == 275
+        assert result[2]["one_rm"] == 380
+
+    def test_blank_enter_also_continues(self, monkeypatch):
+        """Pressing Enter (blank) on the review prompt also continues."""
+        lifts = self._make_lifts()
+        inputs = iter([""])
+        monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+
+        result = cli._review_and_edit_lifts(lifts)
+        assert result is lifts  # same list returned
+
+    def test_edit_first_lift_updates_one_rm(self, monkeypatch):
+        """
+        Typing '1' selects lift 1; new 1RM is applied; 'c' then continues.
+        Sequence: edit lift 1 → squat prompt → new 1RM → bar → label → 'c'
+        """
+        lifts = self._make_lifts()
+        inputs = iter([
+            "1",     # edit lift 1 (squat)
+            "465",   # new squat 1RM
+            "",      # bar weight -> keep 45
+            "",      # bar label  -> none
+            "c",     # done
+        ])
+        monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+
+        result = cli._review_and_edit_lifts(lifts)
+
+        assert result[0]["one_rm"] == 465
+        assert result[1]["one_rm"] == 275  # unchanged
+        assert result[2]["one_rm"] == 380  # unchanged
+
+    def test_edit_lift_with_custom_bar(self, monkeypatch):
+        """
+        Editing a lift can also update its bar weight and label.
+        """
+        lifts = self._make_lifts()
+        inputs = iter([
+            "3",          # edit lift 3 (deadlift)
+            "405",        # new deadlift 1RM
+            "60",         # new bar weight (Trap Bar)
+            "Trap Bar",   # bar label
+            "c",          # done
+        ])
+        monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+
+        result = cli._review_and_edit_lifts(lifts)
+
+        assert result[2]["one_rm"] == 405
+        assert result[2]["bar_weight"] == 60.0
+        assert result[2]["bar_label"] == "Trap Bar"
+
+    def test_edit_wpu_updates_added_weight_and_bw(self, monkeypatch):
+        """
+        Editing a WPU entry re-prompts bodyweight and set string.
+        total_1rm = BW + added = 212 + 85 = 297 stored.
+        """
+        lifts = [
+            {"exercise": "squat",         "one_rm": 455, "body_weight": None, "bar_weight": 45.0, "bar_label": None},
+            {"exercise": "weighted pullup","one_rm": 297, "body_weight": 212, "bar_weight": 45.0, "bar_label": None},
+        ]
+        inputs = iter([
+            "2",      # edit WPU
+            "",       # keep bodyweight (212)
+            "45 5",   # new WPU set: +45 lb for 5 reps
+            "c",      # done
+        ])
+        monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+
+        result = cli._review_and_edit_lifts(lifts)
+
+        # New total = BW(212) + 45 for 5 reps -> Epley(257, 5)
+        assert result[1]["body_weight"] == 212
+        assert result[1]["one_rm"] > 297  # should be higher since 45 > 85 added
+
+    def test_invalid_choice_then_valid_continues(self, monkeypatch, capsys):
+        """
+        Non-numeric input shows an error; valid number then 'c' works normally.
+        """
+        lifts = self._make_lifts()
+        inputs = iter([
+            "foo",   # invalid
+            "abc",   # invalid
+            "1",     # edit lift 1
+            "460",   # new 1RM
+            "",      # bar weight
+            "",      # bar label
+            "c",     # done
+        ])
+        monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+
+        result = cli._review_and_edit_lifts(lifts)
+        out = capsys.readouterr().out
+
+        assert "Enter a lift number" in out
+        assert result[0]["one_rm"] == 460
+
+    def test_out_of_range_number_shows_error(self, monkeypatch, capsys):
+        """Choosing a number outside the list range shows an error and loops."""
+        lifts = self._make_lifts()
+        inputs = iter([
+            "9",   # out of range (only 3 lifts)
+            "c",   # then continue
+        ])
+        monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+
+        result = cli._review_and_edit_lifts(lifts)
+        out = capsys.readouterr().out
+
+        assert "between 1 and 3" in out
+        assert result[0]["one_rm"] == 455  # unchanged
+
+    def test_empty_lifts_returns_immediately(self, monkeypatch):
+        """Empty lift list skips the review entirely."""
+        called = []
+        monkeypatch.setattr(builtins, "input", lambda _="": called.append(1) or "c")
+
+        result = cli._review_and_edit_lifts([])
+
+        assert result == []
+        assert len(called) == 0  # input never called
+
+
+def test_interactive_review_edits_squat_before_generating(
+    monkeypatch, no_side_effects
+):
+    """
+    Integration: user enters squat 1RM as 455, then at the review screen
+    edits it to 465 before continuing.
+    """
+    captured = no_side_effects
+
+    inputs = iter([
+        "",      # title -> default
+        "1",     # template -> Classic
+        "455",   # squat 1RM
+        "",      # squat bar weight
+        "",      # squat bar label
+        "275",   # bench 1RM
+        "",      # bench bar weight
+        "",      # bench bar label
+        "500",   # deadlift 1RM
+        "",      # deadlift bar weight
+        "",      # deadlift bar label
+        "",      # WPU skip
+        # --- review step ---
+        "1",     # edit lift 1 (squat)
+        "465",   # corrected squat 1RM
+        "",      # bar weight keep
+        "",      # bar label keep
+        "c",     # done reviewing
+        # --- continue ---
+        "",      # week -> all
+        "t",     # output mode
+    ])
+
+    monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+    cli.run_interactive()
+
+    lifts = {l["exercise"]: l for l in captured["args"].lifts}
+    assert lifts["squat"]["one_rm"] == 465   # corrected value
+    assert lifts["bench press"]["one_rm"] == 275
+    assert lifts["deadlift"]["one_rm"] == 500

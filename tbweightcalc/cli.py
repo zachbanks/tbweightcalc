@@ -467,6 +467,115 @@ def parse_weighted_pullup_string(bodyweight: int, raw: str) -> int | None:
 # -------------------------------------------------------------------
 
 
+def _lift_summary_line(lift: dict) -> str:
+    """
+    Return a concise one-line summary for a single lift entry, e.g.:
+      'Squat: 455#'
+      'Deadlift (Trap Bar - 60#): 380#'
+      'Weighted Pull-Up: 85# added @ BW 212#'
+    """
+    name = format_exercise_name(lift["exercise"])
+    one_rm = lift["one_rm"]
+    bw = lift.get("body_weight")
+    bar_lbl = lift.get("bar_label")
+    bar_wt = lift.get("bar_weight", 45.0)
+
+    if bw is not None:
+        added = one_rm - bw
+        return f"{name}: {added}# added @ BW {bw}#"
+
+    bar_suffix = ""
+    if bar_lbl and bar_wt != 45.0:
+        w = int(bar_wt) if bar_wt == int(bar_wt) else bar_wt
+        bar_suffix = f" ({bar_lbl} - {w}#)"
+    elif bar_lbl:
+        bar_suffix = f" ({bar_lbl})"
+    elif bar_wt != 45.0:
+        w = int(bar_wt) if bar_wt == int(bar_wt) else bar_wt
+        bar_suffix = f" ({w}# bar)"
+
+    return f"{name}{bar_suffix}: {one_rm}#"
+
+
+def _review_and_edit_lifts(lifts: list[dict]) -> list[dict]:
+    """
+    Show a numbered summary of all entered lifts and let the user
+    re-enter any entry before continuing.
+
+    Typing a lift number re-prompts that lift.
+    Typing 'c' (or pressing Enter) accepts the list and returns it.
+    """
+    if not lifts:
+        return lifts
+
+    while True:
+        print("\n--- Review Your Lifts ---")
+        for i, lift in enumerate(lifts, start=1):
+            print(f"  [{i}] {_lift_summary_line(lift)}")
+        print("  [c] Continue / done")
+
+        choice = input("Edit # or [c] to continue: ").strip().lower()
+
+        if choice in ("c", ""):
+            break
+
+        try:
+            idx = int(choice)
+        except ValueError:
+            print("Enter a lift number to edit, or 'c' to continue.")
+            continue
+
+        if not (1 <= idx <= len(lifts)):
+            print(f"Please enter a number between 1 and {len(lifts)}.")
+            continue
+
+        lift = lifts[idx - 1]
+        ex_name = lift["exercise"]
+
+        if ex_name == "weighted pullup":
+            bw = lift.get("body_weight")
+            total_1rm = lift["one_rm"]
+            added = total_1rm - bw if bw else total_1rm
+            print(f"\nRe-entering Weighted Pull-Up (current: {added}# added @ BW {bw}#)")
+
+            bw_raw = input(f"Bodyweight in lbs (current {bw}#, blank to keep): ").strip()
+            new_bw = bw
+            if bw_raw:
+                try:
+                    new_bw = int(bw_raw)
+                except ValueError:
+                    print("Invalid bodyweight; keeping current.")
+
+            wpu_raw = input(
+                "WPU set (e.g. '35 4', '35x4', blank to keep current): "
+            ).strip()
+            if wpu_raw:
+                est = parse_weighted_pullup_string(new_bw, wpu_raw)
+                if est is not None:
+                    lifts[idx - 1]["one_rm"] = est
+                    lifts[idx - 1]["body_weight"] = new_bw
+                    print(f"Updated: {_lift_summary_line(lifts[idx - 1])}")
+                else:
+                    print("Could not parse WPU input; keeping current values.")
+            elif new_bw != bw:
+                # BW changed, no new set entered — preserve the added weight
+                lifts[idx - 1]["one_rm"] = new_bw + added
+                lifts[idx - 1]["body_weight"] = new_bw
+                print(f"Updated: {_lift_summary_line(lifts[idx - 1])}")
+        else:
+            print(f"\nRe-entering {format_exercise_name(ex_name)} (current: {lift['one_rm']}#)")
+            one_rm, bar_weight, bar_label = _prompt_for_exercise_1rm(ex_name)
+            if one_rm is not None:
+                lifts[idx - 1]["one_rm"] = one_rm
+                lifts[idx - 1]["bar_weight"] = bar_weight
+                lifts[idx - 1]["bar_label"] = bar_label
+                print(f"Updated: {_lift_summary_line(lifts[idx - 1])}")
+            else:
+                print("No valid 1RM entered; keeping current value.")
+
+    return lifts
+
+
 def prompt_bar_weight(exercise_name: str) -> tuple[float, str | None]:
     """
     Prompt for bar weight with default of 45 pounds and optional label.
@@ -795,6 +904,9 @@ def run_interactive() -> None:
                 add_another = input("\nAdd another exercise? (y/n, default n): ").strip().lower()
                 if add_another not in ("y", "yes"):
                     break
+
+    # ---------- Review & edit all lifts before generating output ----------
+    lifts = _review_and_edit_lifts(lifts)
 
     # ---------- Week selection ----------
     week_input = input("\nWeek (1–6 or 'all', default 'all'): ").strip().lower()
