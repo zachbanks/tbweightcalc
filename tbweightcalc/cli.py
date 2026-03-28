@@ -805,6 +805,8 @@ def run_interactive() -> None:
     lifts: list[dict] = []
     loaded_from_session = False
 
+    loaded_session_name: str | None = None
+
     if sessions:
         print("Saved sessions:")
         _print_sessions(sessions)
@@ -814,14 +816,22 @@ def run_interactive() -> None:
             if session:
                 lifts = [dict(lift) for lift in session["lifts"]]
                 loaded_from_session = True
+                loaded_session_name = session["name"]
                 print(f"[Loaded '{session['name']}']")
             else:
                 print(f"No session found for '{load_raw}'; starting fresh.")
 
     # --- Title ---
-    raw_title = input("\nProgram title (leave blank for default): ").strip()
+    # When editing a saved session, pre-fill its name as the title default.
+    if loaded_session_name:
+        title_prompt = f"\nProgram title (Enter for '{loaded_session_name}'): "
+    else:
+        title_prompt = "\nProgram title (leave blank for default): "
+    raw_title = input(title_prompt).strip()
     if raw_title:
         title = raw_title
+    elif loaded_session_name:
+        title = loaded_session_name
     else:
         title = f"Tactical Barbell Max Strength: {datetime.date.today():%Y-%m-%d}"
 
