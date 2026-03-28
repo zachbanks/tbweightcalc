@@ -677,14 +677,11 @@ def test_interactive_template_classic_builds_expected_lifts(
             "",  # title
             "1",  # template choice -> Classic
             "455",  # squat 1RM
-            "",  # squat bar weight -> default 45
-            "",  # squat bar label -> none
+            "",  # squat bar weight -> default 45 (blank returns immediately, no label prompt)
             "315",  # bench 1RM
             "",  # bench bar weight -> default 45
-            "",  # bench bar label -> none
             "500",  # deadlift 1RM
             "",  # deadlift bar weight -> default 45
-            "",  # deadlift bar label -> none
             "",  # WPU bodyweight skip
             "c",  # review -> continue without changes
             "",  # week -> "all"
@@ -724,13 +721,10 @@ def test_interactive_template_front_squat_block_builds_expected_lifts(
             "2",  # template choice -> Front-squat Block
             "355",  # front squat 1RM
             "",  # front squat bar weight -> default 45
-            "",  # front squat bar label -> none
             "185",  # overhead press 1RM
             "",  # overhead press bar weight -> default 45
-            "",  # overhead press bar label -> none
             "495",  # deadlift 1RM
             "",  # deadlift bar weight -> default 45
-            "",  # deadlift bar label -> none
             "200",  # WPU bodyweight
             "35x4",  # WPU set
             "c",  # review -> continue without changes
@@ -774,13 +768,10 @@ def test_interactive_template_zercher_block_builds_expected_lifts(
             "3",  # template choice -> Zercher Block
             "315",  # zercher squat 1RM
             "",  # zercher squat bar weight -> default 45
-            "",  # zercher squat bar label -> none
             "225",  # bench press 1RM
             "",  # bench press bar weight -> default 45
-            "",  # bench press bar label -> none
             "405",  # deadlift 1RM
             "",  # deadlift bar weight -> default 45
-            "",  # deadlift bar label -> none
             "",  # WPU bodyweight skip
             "c",  # review -> continue without changes
             "",  # week -> "all"
@@ -821,30 +812,25 @@ def test_interactive_template_custom_with_extra_exercises(
             # Lower-body main lift slot
             "1",  # choose squat
             "455",  # squat 1RM
-            "",  # squat bar weight -> default 45
-            "",  # squat bar label -> none
+            "",  # squat bar weight -> default 45 (blank returns immediately)
             # Upper-body main press slot
             "1",  # choose bench press
             "315",  # bench 1RM
             "",  # bench bar weight -> default 45
-            "",  # bench bar label -> none
             # Hinge slot
             "1",  # choose deadlift
             "500",  # deadlift 1RM
             "",  # deadlift bar weight -> default 45
-            "",  # deadlift bar label -> none
             "",  # WPU bodyweight skip
             # Extra exercises
             "y",  # add extra exercises? yes
             "5",  # select overhead press (5th in EXERCISE_PROFILES keys alphabetically)
             "185",  # overhead press 1RM
             "",  # overhead press bar weight -> default 45
-            "",  # overhead press bar label -> none
             "y",  # add another? yes
             "2",  # select front squat (2nd in EXERCISE_PROFILES keys alphabetically)
             "355",  # front squat 1RM
             "",  # front squat bar weight -> default 45
-            "",  # front squat bar label -> none
             "n",  # add another? no
             "c",  # review -> continue without changes
             "",  # week -> "all"
@@ -1037,20 +1023,16 @@ def test_interactive_review_edits_squat_before_generating(
         "",      # title -> default
         "1",     # template -> Classic
         "455",   # squat 1RM
-        "",      # squat bar weight
-        "",      # squat bar label
+        "",      # squat bar weight (blank -> 45, no label prompt)
         "275",   # bench 1RM
         "",      # bench bar weight
-        "",      # bench bar label
         "500",   # deadlift 1RM
         "",      # deadlift bar weight
-        "",      # deadlift bar label
         "",      # WPU skip
         # --- review step ---
         "1",     # edit lift 1 (squat)
         "465",   # corrected squat 1RM
-        "",      # bar weight keep
-        "",      # bar label keep
+        "",      # bar weight keep (blank -> 45, no label prompt)
         "c",     # done reviewing
         # --- continue ---
         "",      # week -> all
@@ -1065,3 +1047,138 @@ def test_interactive_review_edits_squat_before_generating(
     assert lifts["squat"]["one_rm"] == 465   # corrected value
     assert lifts["bench press"]["one_rm"] == 275
     assert lifts["deadlift"]["one_rm"] == 500
+
+
+# -------------------------------------------------------------------
+# Tests for prompt_bar_weight (saved bars recall)
+# -------------------------------------------------------------------
+
+class TestPromptBarWeight:
+    """Unit tests for prompt_bar_weight with saved bar store."""
+
+    def test_default_returns_45_no_label(self, monkeypatch, tmp_path):
+        from tbweightcalc.sessions import SessionStore
+        store = SessionStore(path=tmp_path / "s.json")
+        inputs = iter([""])  # blank -> default 45
+        monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+        weight, label = cli.prompt_bar_weight("squat", store=store)
+        assert weight == 45.0
+        assert label is None
+
+    def test_custom_weight_with_label(self, monkeypatch, tmp_path):
+        from tbweightcalc.sessions import SessionStore
+        store = SessionStore(path=tmp_path / "s.json")
+        inputs = iter(["60", "Trap Bar", "n"])  # weight, label, don't save
+        monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+        weight, label = cli.prompt_bar_weight("deadlift", store=store)
+        assert weight == 60.0
+        assert label == "Trap Bar"
+
+    def test_select_saved_bar_by_index(self, monkeypatch, tmp_path):
+        from tbweightcalc.sessions import SessionStore
+        store = SessionStore(path=tmp_path / "s.json")
+        store.save_bar("Trap Bar", 60)
+        store.save_bar("C-70", 35)
+        inputs = iter(["2"])  # pick second saved bar
+        monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+        weight, label = cli.prompt_bar_weight("deadlift", store=store)
+        assert weight == 35.0
+        assert label == "C-70"
+
+    def test_save_new_bar_when_prompted(self, monkeypatch, tmp_path):
+        from tbweightcalc.sessions import SessionStore
+        store = SessionStore(path=tmp_path / "s.json")
+        inputs = iter(["60", "Trap Bar", "y"])  # weight, label, save yes
+        monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+        cli.prompt_bar_weight("deadlift", store=store)
+        bars = store.list_bars()
+        assert len(bars) == 1
+        assert bars[0]["name"] == "Trap Bar"
+        assert bars[0]["weight"] == 60.0
+
+    def test_no_save_prompt_without_store(self, monkeypatch):
+        inputs = iter(["60", "My Bar"])  # weight, label — no save prompt
+        monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+        weight, label = cli.prompt_bar_weight("squat")
+        assert weight == 60.0
+        assert label == "My Bar"
+
+    def test_no_save_prompt_for_default_weight(self, monkeypatch, tmp_path):
+        from tbweightcalc.sessions import SessionStore
+        store = SessionStore(path=tmp_path / "s.json")
+        # 45# with a label — should NOT prompt to save (standard bar)
+        inputs = iter(["45", "Standard Bar"])
+        monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+        weight, label = cli.prompt_bar_weight("squat", store=store)
+        assert weight == 45.0
+        assert label == "Standard Bar"
+        assert store.list_bars() == []
+
+
+# -------------------------------------------------------------------
+# Tests for _prompt_save_session (title auto-fill)
+# -------------------------------------------------------------------
+
+class TestPromptSaveSession:
+    """Unit tests for _prompt_save_session default name behaviour."""
+
+    def _store(self, tmp_path):
+        from tbweightcalc.sessions import SessionStore
+        return SessionStore(path=tmp_path / "s.json")
+
+    LIFTS = [{"exercise": "squat", "one_rm": 455, "body_weight": None, "bar_weight": 45.0, "bar_label": None}]
+
+    def test_enter_uses_default_name(self, monkeypatch, tmp_path):
+        store = self._store(tmp_path)
+        monkeypatch.setattr(builtins, "input", lambda _="": "")  # press Enter
+        cli._prompt_save_session(self.LIFTS, store, default_name="TB2026-02 Home")
+        sessions = store.list_sessions()
+        assert len(sessions) == 1
+        assert sessions[0]["name"] == "TB2026-02 Home"
+
+    def test_custom_name_overrides_default(self, monkeypatch, tmp_path):
+        store = self._store(tmp_path)
+        monkeypatch.setattr(builtins, "input", lambda _="": "My Custom Name")
+        cli._prompt_save_session(self.LIFTS, store, default_name="TB2026-02 Home")
+        sessions = store.list_sessions()
+        assert sessions[0]["name"] == "My Custom Name"
+
+    def test_n_skips_save(self, monkeypatch, tmp_path):
+        store = self._store(tmp_path)
+        monkeypatch.setattr(builtins, "input", lambda _="": "n")
+        cli._prompt_save_session(self.LIFTS, store, default_name="TB2026-02 Home")
+        assert store.list_sessions() == []
+
+    def test_blank_without_default_skips(self, monkeypatch, tmp_path):
+        store = self._store(tmp_path)
+        monkeypatch.setattr(builtins, "input", lambda _="": "")
+        cli._prompt_save_session(self.LIFTS, store)
+        assert store.list_sessions() == []
+
+    def test_title_auto_fill_in_interactive(self, monkeypatch, tmp_path, no_side_effects):
+        """Title entered by user becomes the default session name."""
+        from tbweightcalc.sessions import SessionStore
+        store = SessionStore(path=tmp_path / "s.json")
+        monkeypatch.setattr(cli, "SessionStore", lambda: store)
+
+        inputs = iter([
+            "TB2026-02 Home",  # title
+            "1",               # template -> Classic
+            "455",             # squat 1RM
+            "",                # squat bar weight (blank -> 45, no label prompt)
+            "275",             # bench 1RM
+            "",                # bench bar weight
+            "500",             # deadlift 1RM
+            "",                # deadlift bar weight
+            "",                # skip WPU
+            "c",               # review done
+            "",                # week all
+            "t",               # text only
+            "",                # save session -> Enter accepts default title
+        ])
+        monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+        cli.run_interactive()
+
+        sessions = store.list_sessions()
+        assert len(sessions) == 1
+        assert sessions[0]["name"] == "TB2026-02 Home"

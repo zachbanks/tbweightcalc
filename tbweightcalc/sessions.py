@@ -93,3 +93,39 @@ class SessionStore:
         data["sessions"] = [s for s in data["sessions"] if s["id"] != session["id"]]
         self._save(data)
         return True
+
+    # ------------------------------------------------------------------
+    # Custom bar management
+    # ------------------------------------------------------------------
+
+    def list_bars(self) -> list[dict]:
+        """Return all saved custom bars as [{"name": str, "weight": float}, ...]."""
+        return self._load().get("bars", [])
+
+    def save_bar(self, name: str, weight: float) -> dict:
+        """Save or update a custom bar by name. Returns the saved bar dict."""
+        data = self._load()
+        bars = data.get("bars", [])
+        bar = {"name": name, "weight": float(weight)}
+        for i, b in enumerate(bars):
+            if b["name"].lower() == name.lower():
+                bars[i] = bar
+                data["bars"] = bars
+                self._save(data)
+                return bar
+        bars.append(bar)
+        data["bars"] = bars
+        self._save(data)
+        return bar
+
+    def delete_bar(self, name: str) -> bool:
+        """Delete a custom bar by name (case-insensitive). Returns True if found."""
+        data = self._load()
+        bars = data.get("bars", [])
+        lower = name.lower()
+        new_bars = [b for b in bars if b["name"].lower() != lower]
+        if len(new_bars) == len(bars):
+            return False
+        data["bars"] = new_bars
+        self._save(data)
+        return True

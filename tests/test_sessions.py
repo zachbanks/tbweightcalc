@@ -245,3 +245,191 @@ def test_cli_delete_session_not_found(tmp_path, capsys, monkeypatch):
 
     out = capsys.readouterr().out
     assert "No session found" in out
+
+
+# ---------------------------------------------------------------------------
+# Custom bar management: save_bar / list_bars / delete_bar
+# ---------------------------------------------------------------------------
+
+def test_save_bar_creates_entry(store):
+    b = store.save_bar("Trap Bar", 60)
+    assert b["name"] == "Trap Bar"
+    assert b["weight"] == 60.0
+
+
+def test_list_bars_empty(store):
+    assert store.list_bars() == []
+
+
+def test_list_bars_returns_saved(store):
+    store.save_bar("Trap Bar", 60)
+    store.save_bar("C-70", 35)
+    bars = store.list_bars()
+    assert len(bars) == 2
+    assert bars[0]["name"] == "Trap Bar"
+    assert bars[1]["name"] == "C-70"
+
+
+def test_save_bar_updates_existing_by_name(store):
+    store.save_bar("Trap Bar", 60)
+    store.save_bar("Trap Bar", 55)
+    bars = store.list_bars()
+    assert len(bars) == 1
+    assert bars[0]["weight"] == 55.0
+
+
+def test_save_bar_case_insensitive_update(store):
+    store.save_bar("trap bar", 60)
+    store.save_bar("Trap Bar", 65)
+    bars = store.list_bars()
+    assert len(bars) == 1
+    assert bars[0]["weight"] == 65.0
+
+
+def test_delete_bar_by_name(store):
+    store.save_bar("C-70", 35)
+    result = store.delete_bar("C-70")
+    assert result is True
+    assert store.list_bars() == []
+
+
+def test_delete_bar_case_insensitive(store):
+    store.save_bar("C-70", 35)
+    result = store.delete_bar("c-70")
+    assert result is True
+    assert store.list_bars() == []
+
+
+def test_delete_bar_not_found(store):
+    result = store.delete_bar("Nonexistent")
+    assert result is False
+
+
+def test_bars_and_sessions_coexist(store):
+    store.save_session("My Program", SAMPLE_LIFTS)
+    store.save_bar("Trap Bar", 60)
+    assert len(store.list_sessions()) == 1
+    assert len(store.list_bars()) == 1
+
+
+def test_bars_persist_across_instances(tmp_path):
+    path = tmp_path / "sessions.json"
+    store1 = SessionStore(path=path)
+    store1.save_bar("Trap Bar", 60)
+
+    store2 = SessionStore(path=path)
+    bars = store2.list_bars()
+    assert len(bars) == 1
+    assert bars[0]["name"] == "Trap Bar"
+    assert bars[0]["weight"] == 60.0
+
+
+# ---------------------------------------------------------------------------
+# CLI integration: --list-bars, --save-bar, --delete-bar
+# ---------------------------------------------------------------------------
+
+def test_cli_list_bars(tmp_path, capsys, monkeypatch):
+    from tbweightcalc import cli
+
+    path = tmp_path / "sessions.json"
+    store = SessionStore(path=path)
+    store.save_bar("Trap Bar", 60)
+    store.save_bar("C-70", 35)
+
+    monkeypatch.setattr(cli, "SessionStore", lambda: store)
+
+    import sys
+    monkeypatch.setattr(sys, "argv", ["tbcalc", "--list-bars"])
+    cli.main()
+
+    out = capsys.readouterr().out
+    assert "Trap Bar" in out
+    assert "60" in out
+    assert "C-70" in out
+    assert "35" in out
+
+
+def test_cli_list_bars_empty(tmp_path, capsys, monkeypatch):
+    from tbweightcalc import cli
+
+    path = tmp_path / "sessions.json"
+    store = SessionStore(path=path)
+
+    monkeypatch.setattr(cli, "SessionStore", lambda: store)
+
+    import sys
+    monkeypatch.setattr(sys, "argv", ["tbcalc", "--list-bars"])
+    cli.main()
+
+    out = capsys.readouterr().out
+    assert "No saved custom bars" in out
+
+
+def test_cli_save_bar(tmp_path, capsys, monkeypatch):
+    from tbweightcalc import cli
+
+    path = tmp_path / "sessions.json"
+    store = SessionStore(path=path)
+
+    monkeypatch.setattr(cli, "SessionStore", lambda: store)
+
+    import sys
+    monkeypatch.setattr(sys, "argv", ["tbcalc", "--save-bar", "Trap Bar", "60"])
+    cli.main()
+
+    out = capsys.readouterr().out
+    assert "Trap Bar" in out
+    bars = store.list_bars()
+    assert len(bars) == 1
+    assert bars[0]["weight"] == 60.0
+
+
+def test_cli_save_bar_invalid_weight(tmp_path, capsys, monkeypatch):
+    from tbweightcalc import cli
+
+    path = tmp_path / "sessions.json"
+    store = SessionStore(path=path)
+
+    monkeypatch.setattr(cli, "SessionStore", lambda: store)
+
+    import sys
+    monkeypatch.setattr(sys, "argv", ["tbcalc", "--save-bar", "Trap Bar", "notanumber"])
+    cli.main()
+
+    out = capsys.readouterr().out
+    assert "Invalid weight" in out
+    assert store.list_bars() == []
+
+
+def test_cli_delete_bar(tmp_path, capsys, monkeypatch):
+    from tbweightcalc import cli
+
+    path = tmp_path / "sessions.json"
+    store = SessionStore(path=path)
+    store.save_bar("C-70", 35)
+
+    monkeypatch.setattr(cli, "SessionStore", lambda: store)
+
+    import sys
+    monkeypatch.setattr(sys, "argv", ["tbcalc", "--delete-bar", "C-70"])
+    cli.main()
+
+    out = capsys.readouterr().out
+    assert "Deleted" in out
+    assert store.list_bars() == []
+
+
+def test_cli_delete_bar_not_found(tmp_path, capsys, monkeypatch):
+    from tbweightcalc import cli
+
+    path = tmp_path / "sessions.json"
+    store = SessionStore(path=path)
+
+    monkeypatch.setattr(cli, "SessionStore", lambda: store)
+
+    import sys
+    monkeypatch.setattr(sys, "argv", ["tbcalc", "--delete-bar", "nothing"])
+    cli.main()
+
+    out = capsys.readouterr().out
+    assert "No bar found" in out

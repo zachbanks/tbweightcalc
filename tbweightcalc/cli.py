@@ -101,7 +101,7 @@ INTERACTIVE_LIFT_SLOTS = [
 ]
 
 
-def _prompt_for_exercise_1rm(exercise_name: str) -> tuple[int | None, float, str | None]:
+def _prompt_for_exercise_1rm(exercise_name: str, store=None) -> tuple[int | None, float, str | None]:
     """
     Look up the interactive prompt text for the given exercise_name
     from INTERACTIVE_LIFT_SLOTS and run prompt_lift_one_rm on it.
@@ -114,14 +114,14 @@ def _prompt_for_exercise_1rm(exercise_name: str) -> tuple[int | None, float, str
                 one_rm = prompt_lift_one_rm(opt["prompt"])
                 if one_rm is None:
                     return (None, 45.0, None)
-                bar_weight, bar_label = prompt_bar_weight(exercise_name)
+                bar_weight, bar_label = prompt_bar_weight(exercise_name, store=store)
                 return (one_rm, bar_weight, bar_label)
     # If not found in config, just fall back to a generic prompt.
     generic = f"{format_exercise_name(exercise_name)} 1RM or set (e.g. '225', '200 5', '200x5', blank to skip): "
     one_rm = prompt_lift_one_rm(generic)
     if one_rm is None:
         return (None, 45.0, None)
-    bar_weight, bar_label = prompt_bar_weight(exercise_name)
+    bar_weight, bar_label = prompt_bar_weight(exercise_name, store=store)
     return (one_rm, bar_weight, bar_label)
 
 
@@ -498,7 +498,7 @@ def _lift_summary_line(lift: dict) -> str:
     return f"{name}{bar_suffix}: {one_rm}#"
 
 
-def _review_and_edit_lifts(lifts: list[dict]) -> list[dict]:
+def _review_and_edit_lifts(lifts: list[dict], store=None) -> list[dict]:
     """
     Show a numbered summary of all entered lifts and let the user
     re-enter any entry before continuing.
@@ -565,7 +565,7 @@ def _review_and_edit_lifts(lifts: list[dict]) -> list[dict]:
                 print(f"Updated: {_lift_summary_line(lifts[idx - 1])}")
         else:
             print(f"\nRe-entering {format_exercise_name(ex_name)} (current: {lift['one_rm']}#)")
-            one_rm, bar_weight, bar_label = _prompt_for_exercise_1rm(ex_name)
+            one_rm, bar_weight, bar_label = _prompt_for_exercise_1rm(ex_name, store=store)
             if one_rm is not None:
                 lifts[idx - 1]["one_rm"] = one_rm
                 lifts[idx - 1]["bar_weight"] = bar_weight
@@ -577,31 +577,59 @@ def _review_and_edit_lifts(lifts: list[dict]) -> list[dict]:
     return lifts
 
 
-def prompt_bar_weight(exercise_name: str) -> tuple[float, str | None]:
+def prompt_bar_weight(exercise_name: str, store=None) -> tuple[float, str | None]:
     """
     Prompt for bar weight with default of 45 pounds and optional label.
+    If a SessionStore is provided, saved custom bars are shown for quick recall.
+    After entering a non-default weight with a label, offers to save it.
 
     Returns:
       - tuple of (bar_weight, bar_label) where bar_label can be None
     """
+    bars = store.list_bars() if store is not None else []
+
     while True:
-        raw = input(f"Bar weight for {exercise_name} (default 45): ").strip()
+        if bars:
+            print(f"  Saved bars:")
+            for i, b in enumerate(bars, start=1):
+                w = int(b["weight"]) if b["weight"] == int(b["weight"]) else b["weight"]
+                print(f"    [{i}] {b['name']} ({w}#)")
 
-        # Default to 45
+        hint = f"1-{len(bars)} for saved bar, or " if bars else ""
+        raw = input(f"Bar weight for {exercise_name} ({hint}default 45): ").strip()
+
         if not raw:
-            bar_weight = 45.0
-        else:
-            try:
-                bar_weight = float(raw)
-                if bar_weight <= 0:
-                    print("Bar weight must be greater than 0. Try again or press Enter for default (45).")
-                    continue
-            except ValueError:
-                print("Invalid input. Enter a number or press Enter for default (45).")
-                continue
+            return (45.0, None)
 
-        # Ask for optional label
-        label = input(f"Optional label for bar (e.g. 'Safety Squat Bar', blank to skip): ").strip()
+        # Check if it's a saved bar index
+        if bars:
+            try:
+                idx = int(raw)
+                if 1 <= idx <= len(bars):
+                    b = bars[idx - 1]
+                    return (b["weight"], b["name"])
+            except ValueError:
+                pass
+
+        # Parse as a weight
+        try:
+            bar_weight = float(raw)
+            if bar_weight <= 0:
+                print("Bar weight must be greater than 0. Try again or press Enter for default (45).")
+                continue
+        except ValueError:
+            print("Invalid input. Enter a number or press Enter for default (45).")
+            continue
+
+        label = input("Optional label for bar (e.g. 'C-70', blank to skip): ").strip()
+
+        # Offer to save as a custom bar if it has a label and a non-standard weight
+        if store is not None and label and bar_weight != 45.0:
+            save_raw = input(f"Save '{label}' ({int(bar_weight) if bar_weight == int(bar_weight) else bar_weight}#) as a custom bar for future use? (y/n): ").strip().lower()
+            if save_raw in ("y", "yes"):
+                store.save_bar(label, bar_weight)
+                print(f"[Saved bar '{label}']")
+
         return (bar_weight, label if label else None)
 
 
@@ -723,12 +751,24 @@ def prompt_one_rm() -> None:
         print("\n[Aborted by user]")
 
 
-def _prompt_save_session(lifts: list[dict], store: SessionStore) -> None:
-    """After generating a program, offer to save the lifts as a named session."""
-    raw = input("\nSave this session? Enter a name (or press Enter to skip): ").strip()
-    if not raw:
+def _prompt_save_session(lifts: list[dict], store: SessionStore, default_name: str | None = None) -> None:
+    """After generating a program, offer to save the lifts as a named session.
+
+    If default_name is provided (e.g. the program title), it is pre-filled so
+    the user can just press Enter to accept it.
+    """
+    if default_name:
+        prompt = f"\nSave this session? Press Enter for '{default_name}', type a new name, or 'n' to skip: "
+    else:
+        prompt = "\nSave this session? Enter a name (or press Enter to skip): "
+
+    raw = input(prompt).strip()
+    if raw.lower() == "n":
         return
-    session = store.save_session(raw, lifts)
+    name = raw or default_name
+    if not name:
+        return
+    session = store.save_session(name, lifts)
     action = "Updated" if "updated" in session else "Saved"
     print(f"[{action} session '{session['name']}' ({session['id']})]")
 
@@ -787,7 +827,7 @@ def run_interactive() -> None:
 
     if loaded_from_session:
         # Skip template/lift entry; go straight to review/edit
-        lifts = _review_and_edit_lifts(lifts)
+        lifts = _review_and_edit_lifts(lifts, store=store)
     else:
         lifts = []
 
@@ -815,7 +855,7 @@ def run_interactive() -> None:
                 preset_exercises = ["zercher squat", "bench press", "deadlift"]
 
             for ex_name in preset_exercises:
-                one_rm, bar_weight, bar_label = _prompt_for_exercise_1rm(ex_name)
+                one_rm, bar_weight, bar_label = _prompt_for_exercise_1rm(ex_name, store=store)
                 if one_rm is not None:
                     lifts.append({"exercise": ex_name, "one_rm": one_rm, "body_weight": None, "bar_weight": bar_weight, "bar_label": bar_label})
 
@@ -852,7 +892,7 @@ def run_interactive() -> None:
                         print("No valid 1RM entered; skipping this lift.")
                         break
 
-                    bar_weight, bar_label = prompt_bar_weight(ex_name)
+                    bar_weight, bar_label = prompt_bar_weight(ex_name, store=store)
                     lifts.append({"exercise": ex_name, "one_rm": one_rm, "body_weight": None, "bar_weight": bar_weight, "bar_label": bar_label})
                     break  # only one selection per slot
 
@@ -931,7 +971,7 @@ def run_interactive() -> None:
                             print(f"Added {format_exercise_name(ex_name)} to your program.")
                             break
 
-                        one_rm, bar_weight, bar_label = _prompt_for_exercise_1rm(ex_name)
+                        one_rm, bar_weight, bar_label = _prompt_for_exercise_1rm(ex_name, store=store)
                         if one_rm is None:
                             print("No valid 1RM entered; skipping this exercise.")
                             break
@@ -945,7 +985,7 @@ def run_interactive() -> None:
                         break
 
         # ---------- Review & edit all lifts before generating output ----------
-        lifts = _review_and_edit_lifts(lifts)
+        lifts = _review_and_edit_lifts(lifts, store=store)
 
     # ---------- Week selection ----------
     week_input = input("\nWeek (1–6 or 'all', default 'all'): ").strip().lower()
@@ -985,7 +1025,7 @@ def run_interactive() -> None:
         print(f"\n[PDF saved to: {pdf_path}]")
 
     # ---------- Save session ----------
-    _prompt_save_session(lifts, store)
+    _prompt_save_session(lifts, store, default_name=title)
 
 
 # -------------------------------------------------------------------
@@ -1078,6 +1118,24 @@ def main() -> None:
         help="Save the current lifts as a named session after generating",
     )
 
+    bar_group = parser.add_argument_group("custom bar management")
+    bar_group.add_argument(
+        "--list-bars",
+        action="store_true",
+        help="List all saved custom bars and exit",
+    )
+    bar_group.add_argument(
+        "--save-bar",
+        nargs=2,
+        metavar=("NAME", "WEIGHT"),
+        help='Save a custom bar by name and weight, e.g. --save-bar "Trap Bar" 60',
+    )
+    bar_group.add_argument(
+        "--delete-bar",
+        metavar="NAME",
+        help="Delete a saved custom bar by name and exit",
+    )
+
     # No arguments at all -> full interactive program mode
     if len(sys.argv) == 1:
         try:
@@ -1093,6 +1151,37 @@ def main() -> None:
     config = load_config(args.config if hasattr(args, 'config') and args.config else None)
 
     store = SessionStore()
+
+    # --- Bar management commands (exit after) ---
+    if args.list_bars:
+        bars = store.list_bars()
+        if not bars:
+            print("No saved custom bars.")
+        else:
+            print("Saved custom bars:")
+            for b in bars:
+                w = int(b["weight"]) if b["weight"] == int(b["weight"]) else b["weight"]
+                print(f"  {b['name']} ({w}#)")
+        return
+
+    if args.save_bar:
+        name, weight_str = args.save_bar
+        try:
+            weight = float(weight_str)
+        except ValueError:
+            print(f"Invalid weight '{weight_str}'. Must be a number.")
+            return
+        store.save_bar(name, weight)
+        w = int(weight) if weight == int(weight) else weight
+        print(f"[Saved bar '{name}' ({w}#)]")
+        return
+
+    if args.delete_bar:
+        if store.delete_bar(args.delete_bar):
+            print(f"Deleted bar '{args.delete_bar}'.")
+        else:
+            print(f"No bar found named '{args.delete_bar}'.")
+        return
 
     # --- Session management commands (exit after) ---
     if args.list_sessions:
