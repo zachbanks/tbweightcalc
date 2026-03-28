@@ -15,6 +15,7 @@ from tbweightcalc.config import Config, load_config
 from tbweightcalc.formatting import Formatter, MarkdownFormatter, PlainFormatter
 from tbweightcalc.onerm import calculate_one_rm
 from tbweightcalc.program import markdown_to_pdf
+from tbweightcalc.sessions import SessionStore
 
 
 # -------------------------------------------------------------------
@@ -722,6 +723,25 @@ def prompt_one_rm() -> None:
         print("\n[Aborted by user]")
 
 
+def _prompt_save_session(lifts: list[dict], store: SessionStore) -> None:
+    """After generating a program, offer to save the lifts as a named session."""
+    raw = input("\nSave this session? Enter a name (or press Enter to skip): ").strip()
+    if not raw:
+        return
+    session = store.save_session(raw, lifts)
+    action = "Updated" if "updated" in session else "Saved"
+    print(f"[{action} session '{session['name']}' ({session['id']})]")
+
+
+def _print_sessions(sessions: list[dict]) -> None:
+    if not sessions:
+        print("  (no saved sessions)")
+        return
+    for i, s in enumerate(sessions, start=1):
+        date = s.get("updated") or s["created"]
+        print(f"  [{i}] {s['name']}  ({date})  id:{s['id']}")
+
+
 def run_interactive() -> None:
     """
     Interactive mode when tbcalc is run with no CLI options.
@@ -738,175 +758,194 @@ def run_interactive() -> None:
     """
     print("Tactical Barbell Max Strength - Interactive Mode\n")
 
+    store = SessionStore()
+
+    # --- Offer to load a saved session ---
+    sessions = store.list_sessions()
+    lifts: list[dict] = []
+    loaded_from_session = False
+
+    if sessions:
+        print("Saved sessions:")
+        _print_sessions(sessions)
+        load_raw = input("\nLoad a session? Enter number/name or press Enter to start fresh: ").strip()
+        if load_raw:
+            session = store.load_session(load_raw)
+            if session:
+                lifts = [dict(lift) for lift in session["lifts"]]
+                loaded_from_session = True
+                print(f"[Loaded '{session['name']}']")
+            else:
+                print(f"No session found for '{load_raw}'; starting fresh.")
+
     # --- Title ---
-    raw_title = input("Program title (leave blank for default): ").strip()
+    raw_title = input("\nProgram title (leave blank for default): ").strip()
     if raw_title:
         title = raw_title
     else:
         title = f"Tactical Barbell Max Strength: {datetime.date.today():%Y-%m-%d}"
 
-    # --- Template selection ---
-    print("\nSelect template:")
-    print("  [1] Classic: Squat / Bench / Deadlift / Weighted Pull-Up")
-    print(
-        "  [2] Front-Squat Block: Front Squat / Overhead Press / Deadlift / Weighted Pull-Up"
-    )
-    print(
-        "  [3] Zercher Block: Zercher Squat / Bench Press / Deadlift / Weighted Pull-Up"
-    )
-    print("  [4] Custom: choose lifts manually")
-    template_choice = input("Template [1/2/3/4, default 1]: ").strip()
-    if template_choice not in ("1", "2", "3", "4"):
-        template_choice = "1"
-
-    lifts: list[dict] = []
-
-    # ---------- Template 1, 2 & 3: quick combos ----------
-    if template_choice in ("1", "2", "3"):
-        if template_choice == "1":
-            preset_exercises = ["squat", "bench press", "deadlift"]
-        elif template_choice == "2":
-            preset_exercises = ["front squat", "overhead press", "deadlift"]
-        else:  # template_choice == "3"
-            preset_exercises = ["zercher squat", "bench press", "deadlift"]
-
-        for ex_name in preset_exercises:
-            one_rm, bar_weight, bar_label = _prompt_for_exercise_1rm(ex_name)
-            if one_rm is not None:
-                lifts.append({"exercise": ex_name, "one_rm": one_rm, "body_weight": None, "bar_weight": bar_weight, "bar_label": bar_label})
-
-    # ---------- Template 4: fully custom per slot ----------
+    if loaded_from_session:
+        # Skip template/lift entry; go straight to review/edit
+        lifts = _review_and_edit_lifts(lifts)
     else:
-        for slot in INTERACTIVE_LIFT_SLOTS:
-            name = slot["name"]
-            options = slot["options"]
+        lifts = []
 
-            print(f"\n{name}:")
-            for idx, opt in enumerate(options, start=1):
-                print(f"  [{idx}] {format_exercise_name(opt['exercise_name'])}")
-            print("  [s] Skip this slot")
+        # --- Template selection ---
+        print("\nSelect template:")
+        print("  [1] Classic: Squat / Bench / Deadlift / Weighted Pull-Up")
+        print(
+            "  [2] Front-Squat Block: Front Squat / Overhead Press / Deadlift / Weighted Pull-Up"
+        )
+        print(
+            "  [3] Zercher Block: Zercher Squat / Bench Press / Deadlift / Weighted Pull-Up"
+        )
+        print("  [4] Custom: choose lifts manually")
+        template_choice = input("Template [1/2/3/4, default 1]: ").strip()
+        if template_choice not in ("1", "2", "3", "4"):
+            template_choice = "1"
 
-            while True:
-                choice = input("Select option: ").strip().lower()
-                if choice in ("s", ""):
-                    # skip this slot
-                    break
-                try:
-                    idx = int(choice)
-                except ValueError:
-                    print("Invalid choice. Enter a number or 's' to skip.")
-                    continue
+        # ---------- Template 1, 2 & 3: quick combos ----------
+        if template_choice in ("1", "2", "3"):
+            if template_choice == "1":
+                preset_exercises = ["squat", "bench press", "deadlift"]
+            elif template_choice == "2":
+                preset_exercises = ["front squat", "overhead press", "deadlift"]
+            else:  # template_choice == "3"
+                preset_exercises = ["zercher squat", "bench press", "deadlift"]
 
-                if not (1 <= idx <= len(options)):
-                    print("Invalid option number. Try again.")
-                    continue
+            for ex_name in preset_exercises:
+                one_rm, bar_weight, bar_label = _prompt_for_exercise_1rm(ex_name)
+                if one_rm is not None:
+                    lifts.append({"exercise": ex_name, "one_rm": one_rm, "body_weight": None, "bar_weight": bar_weight, "bar_label": bar_label})
 
-                selected = options[idx - 1]
-                ex_name = selected["exercise_name"]
-                prompt_text = selected["prompt"]
-                one_rm = prompt_lift_one_rm(prompt_text)
-                if one_rm is None:
-                    print("No valid 1RM entered; skipping this lift.")
-                    break
+        # ---------- Template 4: fully custom per slot ----------
+        else:
+            for slot in INTERACTIVE_LIFT_SLOTS:
+                slot_name = slot["name"]
+                options = slot["options"]
 
-                bar_weight, bar_label = prompt_bar_weight(ex_name)
-                lifts.append({"exercise": ex_name, "one_rm": one_rm, "body_weight": None, "bar_weight": bar_weight, "bar_label": bar_label})
-                break  # only one selection per slot
-
-    # ---------- Weighted pull-up (common for all templates) ----------
-    weighted_pullup_entry: dict | None = None
-
-    bw_raw = input(
-        "\nBodyweight for weighted pull-ups (lb, blank to skip WPU): "
-    ).strip()
-    if bw_raw:
-        try:
-            bodyweight = int(bw_raw)
-        except ValueError:
-            print("Could not parse bodyweight; skipping weighted pull-ups.")
-            bodyweight = None
-        if bodyweight is not None:
-            while True:
-                wpu_raw = input(
-                    "Weighted pull-up set (e.g. '35 4', '35x4', 'bw 4', 'bw x 4', blank to skip): "
-                ).strip()
-                if not wpu_raw:
-                    break
-                est = parse_weighted_pullup_string(bodyweight, wpu_raw)
-                if est is None:
-                    print(
-                        "Could not parse that set. Try again (or press Enter to skip)."
-                    )
-                    continue
-                weighted_pullup_entry = {
-                    "one_rm": est,
-                    "body_weight": bodyweight,
-                }
-                break
-
-    if weighted_pullup_entry is not None:
-        lifts.append({
-            "exercise": "weighted pullup",
-            "one_rm": weighted_pullup_entry["one_rm"],
-            "body_weight": weighted_pullup_entry["body_weight"],
-            "bar_weight": 45.0,
-        })
-
-    # ---------- Extra exercises (custom template only) ----------
-    if template_choice == "4":
-        add_extra = input("\nWould you like to add extra exercises? (y/n, default n): ").strip().lower()
-
-        if add_extra in ("y", "yes"):
-            # Get list of all available exercises from EXERCISE_PROFILES
-            from tbweightcalc.exercise_cluster import EXERCISE_PROFILES
-            available = list(EXERCISE_PROFILES.keys())
-
-            while True:
-                print("\nAvailable exercises:")
-                for idx, ex_name in enumerate(available, start=1):
-                    print(f"  [{idx}] {format_exercise_name(ex_name)}")
+                print(f"\n{slot_name}:")
+                for idx, opt in enumerate(options, start=1):
+                    print(f"  [{idx}] {format_exercise_name(opt['exercise_name'])}")
+                print("  [s] Skip this slot")
 
                 while True:
-                    choice = input("Select exercise number: ").strip()
+                    choice = input("Select option: ").strip().lower()
+                    if choice in ("s", ""):
+                        break
                     try:
                         idx = int(choice)
                     except ValueError:
-                        print("Invalid choice. Enter a number.")
+                        print("Invalid choice. Enter a number or 's' to skip.")
                         continue
 
-                    if not (1 <= idx <= len(available)):
+                    if not (1 <= idx <= len(options)):
                         print("Invalid option number. Try again.")
                         continue
 
-                    ex_name = available[idx - 1]
+                    selected = options[idx - 1]
+                    ex_name = selected["exercise_name"]
+                    prompt_text = selected["prompt"]
+                    one_rm = prompt_lift_one_rm(prompt_text)
+                    if one_rm is None:
+                        print("No valid 1RM entered; skipping this lift.")
+                        break
 
-                    # Special handling for weighted pull-ups
-                    if ex_name == "weighted pullup":
-                        wpu_1rm, bodyweight = prompt_weighted_pullup_interactive()
-                        if wpu_1rm is None:
-                            print("No valid weighted pull-up data entered; skipping this exercise.")
+                    bar_weight, bar_label = prompt_bar_weight(ex_name)
+                    lifts.append({"exercise": ex_name, "one_rm": one_rm, "body_weight": None, "bar_weight": bar_weight, "bar_label": bar_label})
+                    break  # only one selection per slot
+
+        # ---------- Weighted pull-up (common for all templates) ----------
+        weighted_pullup_entry: dict | None = None
+
+        bw_raw = input(
+            "\nBodyweight for weighted pull-ups (lb, blank to skip WPU): "
+        ).strip()
+        if bw_raw:
+            try:
+                bodyweight = int(bw_raw)
+            except ValueError:
+                print("Could not parse bodyweight; skipping weighted pull-ups.")
+                bodyweight = None
+            if bodyweight is not None:
+                while True:
+                    wpu_raw = input(
+                        "Weighted pull-up set (e.g. '35 4', '35x4', 'bw 4', 'bw x 4', blank to skip): "
+                    ).strip()
+                    if not wpu_raw:
+                        break
+                    est = parse_weighted_pullup_string(bodyweight, wpu_raw)
+                    if est is None:
+                        print(
+                            "Could not parse that set. Try again (or press Enter to skip)."
+                        )
+                        continue
+                    weighted_pullup_entry = {
+                        "one_rm": est,
+                        "body_weight": bodyweight,
+                    }
+                    break
+
+        if weighted_pullup_entry is not None:
+            lifts.append({
+                "exercise": "weighted pullup",
+                "one_rm": weighted_pullup_entry["one_rm"],
+                "body_weight": weighted_pullup_entry["body_weight"],
+                "bar_weight": 45.0,
+            })
+
+        # ---------- Extra exercises (custom template only) ----------
+        if template_choice == "4":
+            add_extra = input("\nWould you like to add extra exercises? (y/n, default n): ").strip().lower()
+
+            if add_extra in ("y", "yes"):
+                from tbweightcalc.exercise_cluster import EXERCISE_PROFILES
+                available = list(EXERCISE_PROFILES.keys())
+
+                while True:
+                    print("\nAvailable exercises:")
+                    for idx, ex_name in enumerate(available, start=1):
+                        print(f"  [{idx}] {format_exercise_name(ex_name)}")
+
+                    while True:
+                        choice = input("Select exercise number: ").strip()
+                        try:
+                            idx = int(choice)
+                        except ValueError:
+                            print("Invalid choice. Enter a number.")
+                            continue
+
+                        if not (1 <= idx <= len(available)):
+                            print("Invalid option number. Try again.")
+                            continue
+
+                        ex_name = available[idx - 1]
+
+                        if ex_name == "weighted pullup":
+                            wpu_1rm, bodyweight = prompt_weighted_pullup_interactive()
+                            if wpu_1rm is None:
+                                print("No valid weighted pull-up data entered; skipping this exercise.")
+                                break
+                            lifts.append({"exercise": ex_name, "one_rm": wpu_1rm, "body_weight": bodyweight, "bar_weight": 45.0})
+                            print(f"Added {format_exercise_name(ex_name)} to your program.")
                             break
-                        lifts.append({"exercise": ex_name, "one_rm": wpu_1rm, "body_weight": bodyweight, "bar_weight": 45.0})
+
+                        one_rm, bar_weight, bar_label = _prompt_for_exercise_1rm(ex_name)
+                        if one_rm is None:
+                            print("No valid 1RM entered; skipping this exercise.")
+                            break
+
+                        lifts.append({"exercise": ex_name, "one_rm": one_rm, "body_weight": None, "bar_weight": bar_weight, "bar_label": bar_label})
                         print(f"Added {format_exercise_name(ex_name)} to your program.")
                         break
 
-                    # Regular exercises (barbell lifts)
-                    one_rm, bar_weight, bar_label = _prompt_for_exercise_1rm(ex_name)
-                    if one_rm is None:
-                        print("No valid 1RM entered; skipping this exercise.")
+                    add_another = input("\nAdd another exercise? (y/n, default n): ").strip().lower()
+                    if add_another not in ("y", "yes"):
                         break
 
-                    lifts.append({"exercise": ex_name, "one_rm": one_rm, "body_weight": None, "bar_weight": bar_weight, "bar_label": bar_label})
-                    print(f"Added {format_exercise_name(ex_name)} to your program.")
-                    break
-
-                # Ask if they want to add another
-                add_another = input("\nAdd another exercise? (y/n, default n): ").strip().lower()
-                if add_another not in ("y", "yes"):
-                    break
-
-    # ---------- Review & edit all lifts before generating output ----------
-    lifts = _review_and_edit_lifts(lifts)
+        # ---------- Review & edit all lifts before generating output ----------
+        lifts = _review_and_edit_lifts(lifts)
 
     # ---------- Week selection ----------
     week_input = input("\nWeek (1–6 or 'all', default 'all'): ").strip().lower()
@@ -944,6 +983,9 @@ def run_interactive() -> None:
         pdf_path.parent.mkdir(parents=True, exist_ok=True)
         markdown_to_pdf(pdf_body, str(pdf_path), title=title)
         print(f"\n[PDF saved to: {pdf_path}]")
+
+    # ---------- Save session ----------
+    _prompt_save_session(lifts, store)
 
 
 # -------------------------------------------------------------------
@@ -1014,6 +1056,28 @@ def main() -> None:
         type=Path,
     )
 
+    session_group = parser.add_argument_group("session management")
+    session_group.add_argument(
+        "--list-sessions",
+        action="store_true",
+        help="List all saved sessions and exit",
+    )
+    session_group.add_argument(
+        "--load-session",
+        metavar="NAME",
+        help="Load a saved session by name, number, or id and generate the program",
+    )
+    session_group.add_argument(
+        "--delete-session",
+        metavar="NAME",
+        help="Delete a saved session by name, number, or id and exit",
+    )
+    session_group.add_argument(
+        "--save-session",
+        metavar="NAME",
+        help="Save the current lifts as a named session after generating",
+    )
+
     # No arguments at all -> full interactive program mode
     if len(sys.argv) == 1:
         try:
@@ -1027,6 +1091,34 @@ def main() -> None:
 
     # Load config
     config = load_config(args.config if hasattr(args, 'config') and args.config else None)
+
+    store = SessionStore()
+
+    # --- Session management commands (exit after) ---
+    if args.list_sessions:
+        sessions = store.list_sessions()
+        if not sessions:
+            print("No saved sessions.")
+        else:
+            print("Saved sessions:")
+            _print_sessions(sessions)
+        return
+
+    if args.delete_session:
+        if store.delete_session(args.delete_session):
+            print(f"Deleted session '{args.delete_session}'.")
+        else:
+            print(f"No session found for '{args.delete_session}'.")
+        return
+
+    # --- Load session lifts ---
+    if args.load_session:
+        session = store.load_session(args.load_session)
+        if session is None:
+            print(f"No session found for '{args.load_session}'.")
+            return
+        args.lifts = session["lifts"]
+        print(f"[Loaded session '{session['name']}']")
 
     # If 1RM calculator flag is used, handle it first and exit
     if args.onerm is not None:
@@ -1086,6 +1178,14 @@ def main() -> None:
 
     # Echo where the PDF went
     print(f"\n[PDF saved to: {pdf_path}]")
+
+    # 4) Save session if requested
+    if args.save_session:
+        lifts_list = args.lifts if hasattr(args, "lifts") and args.lifts else []
+        if lifts_list:
+            session = store.save_session(args.save_session, lifts_list)
+            action = "Updated" if "updated" in session else "Saved"
+            print(f"[{action} session '{session['name']}' ({session['id']})]")
 
 
 if __name__ == "__main__":

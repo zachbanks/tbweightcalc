@@ -616,11 +616,14 @@ class TestPromptWeightedPullupInteractive:
 
 
 @pytest.fixture
-def no_side_effects(monkeypatch):
+def no_side_effects(monkeypatch, tmp_path):
     """
     Disable clipboard + PDF side effects, and capture args passed into
-    build_program_markdown for inspection.
+    build_program_markdown for inspection. Also isolates the session store
+    so tests don't read/write the real sessions file.
     """
+    from tbweightcalc.sessions import SessionStore
+
     captured = {}
 
     def fake_copy_to_clipboard(_text: str) -> None:
@@ -634,6 +637,10 @@ def no_side_effects(monkeypatch):
     ) -> str:
         captured["args"] = args
         return "# TEST PROGRAM"
+
+    # Use a fresh, empty session store backed by a temp file
+    empty_store = SessionStore(path=tmp_path / "sessions.json")
+    monkeypatch.setattr(cli, "SessionStore", lambda: empty_store)
 
     monkeypatch.setattr(cli, "copy_to_clipboard", fake_copy_to_clipboard)
     monkeypatch.setattr(cli, "markdown_to_pdf", fake_markdown_to_pdf)
@@ -682,6 +689,7 @@ def test_interactive_template_classic_builds_expected_lifts(
             "c",  # review -> continue without changes
             "",  # week -> "all"
             "t",  # output mode
+            "",  # save session -> skip
         ]
     )
 
@@ -728,6 +736,7 @@ def test_interactive_template_front_squat_block_builds_expected_lifts(
             "c",  # review -> continue without changes
             "3",  # week = 3
             "t",  # output mode
+            "",  # save session -> skip
         ]
     )
 
@@ -776,6 +785,7 @@ def test_interactive_template_zercher_block_builds_expected_lifts(
             "c",  # review -> continue without changes
             "",  # week -> "all"
             "t",  # output mode
+            "",  # save session -> skip
         ]
     )
 
@@ -839,6 +849,7 @@ def test_interactive_template_custom_with_extra_exercises(
             "c",  # review -> continue without changes
             "",  # week -> "all"
             "t",  # output mode
+            "",  # save session -> skip
         ]
     )
 
@@ -1044,6 +1055,7 @@ def test_interactive_review_edits_squat_before_generating(
         # --- continue ---
         "",      # week -> all
         "t",     # output mode
+        "",      # save session -> skip
     ])
 
     monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
