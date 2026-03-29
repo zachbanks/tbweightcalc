@@ -836,8 +836,10 @@ def run_interactive() -> None:
         title = f"Tactical Barbell Max Strength: {datetime.date.today():%Y-%m-%d}"
 
     if loaded_from_session:
-        # Skip template/lift entry; go straight to review/edit
-        lifts = _review_and_edit_lifts(lifts, store=store)
+        mode = input("\nOutput directly or edit first? [o/e, default o]: ").strip().lower()
+        if mode == "e":
+            lifts = _review_and_edit_lifts(lifts, store=store)
+        # else: output directly — use lifts as-is
     else:
         lifts = []
 

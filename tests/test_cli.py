@@ -1136,6 +1136,90 @@ class TestPromptSaveSession:
         assert len(sessions) == 1
         assert sessions[0]["name"] == "TB2026-02 Home"
 
+
+# -------------------------------------------------------------------
+# Tests for direct-output from loaded session
+# -------------------------------------------------------------------
+
+SAVED_LIFTS = [
+    {"exercise": "squat", "one_rm": 455, "body_weight": None, "bar_weight": 45.0, "bar_label": None},
+    {"exercise": "bench press", "one_rm": 275, "body_weight": None, "bar_weight": 45.0, "bar_label": None},
+    {"exercise": "deadlift", "one_rm": 500, "body_weight": None, "bar_weight": 45.0, "bar_label": None},
+]
+
+
+def test_loaded_session_direct_output_skips_edit(monkeypatch, tmp_path, no_side_effects):
+    """Loading a session and choosing 'o' (or Enter) outputs directly without edit."""
+    from tbweightcalc.sessions import SessionStore
+    store = SessionStore(path=tmp_path / "s.json")
+    store.save_session("Home Block", SAVED_LIFTS)
+    monkeypatch.setattr(cli, "SessionStore", lambda: store)
+
+    inputs = iter([
+        "1",    # load session 1
+        "",     # title -> use session name
+        "",     # output or edit -> default 'o' (direct output)
+        "",     # week -> all
+        "t",    # text only
+        "",     # save -> skip
+    ])
+    monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+    captured = no_side_effects
+    cli.run_interactive()
+
+    args = captured["args"]
+    lifts = {l["exercise"]: l for l in args.lifts}
+    assert lifts["squat"]["one_rm"] == 455
+    assert lifts["bench press"]["one_rm"] == 275
+    assert lifts["deadlift"]["one_rm"] == 500
+
+
+def test_loaded_session_edit_choice_enters_edit_flow(monkeypatch, tmp_path, no_side_effects):
+    """Loading a session and choosing 'e' enters the edit/review flow."""
+    from tbweightcalc.sessions import SessionStore
+    store = SessionStore(path=tmp_path / "s.json")
+    store.save_session("Home Block", SAVED_LIFTS)
+    monkeypatch.setattr(cli, "SessionStore", lambda: store)
+
+    inputs = iter([
+        "1",    # load session 1
+        "",     # title -> use session name
+        "e",    # edit first
+        "c",    # review -> continue without changes
+        "",     # week -> all
+        "t",    # text only
+        "",     # save -> skip
+    ])
+    monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+    captured = no_side_effects
+    cli.run_interactive()
+
+    args = captured["args"]
+    lifts = {l["exercise"]: l for l in args.lifts}
+    assert lifts["squat"]["one_rm"] == 455
+
+
+def test_loaded_session_direct_output_title_preserved(monkeypatch, tmp_path, no_side_effects):
+    """Session name is used as title when outputting directly."""
+    from tbweightcalc.sessions import SessionStore
+    store = SessionStore(path=tmp_path / "s.json")
+    store.save_session("TB2026-04 Home", SAVED_LIFTS)
+    monkeypatch.setattr(cli, "SessionStore", lambda: store)
+
+    inputs = iter([
+        "1",    # load session
+        "",     # title -> use session name
+        "",     # direct output
+        "",     # week -> all
+        "t",    # text only
+        "",     # save -> skip
+    ])
+    monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+    captured = no_side_effects
+    cli.run_interactive()
+
+    args = captured["args"]
+    assert args.title == "TB2026-04 Home"
     def test_custom_name_overrides_default(self, monkeypatch, tmp_path):
         store = self._store(tmp_path)
         monkeypatch.setattr(builtins, "input", lambda _="": "My Custom Name")
