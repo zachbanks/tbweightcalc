@@ -1388,3 +1388,129 @@ def test_duplicate_session_lifts_match_original(monkeypatch, tmp_path, no_side_e
     assert lifts["squat"]["one_rm"] == 455
     assert lifts["bench press"]["one_rm"] == 275
     assert lifts["deadlift"]["one_rm"] == 500
+
+
+# -------------------------------------------------------------------
+# Tests for delete session from interactive list
+# -------------------------------------------------------------------
+
+def test_delete_session_by_number(monkeypatch, tmp_path, no_side_effects):
+    """'del 1' at the session prompt deletes that session and continues fresh."""
+    from tbweightcalc.sessions import SessionStore
+    store = SessionStore(path=tmp_path / "s.json")
+    store.save_session("Home Block", SAVED_LIFTS)
+    store.save_session("Gym Block", SAVED_LIFTS)
+    monkeypatch.setattr(cli, "SessionStore", lambda: store)
+
+    inputs = iter([
+        "del 1",    # delete session 1 ("Home Block")
+        "",         # title -> default
+        "1",        # template -> Classic
+        "455",      # squat 1RM
+        "",         # squat bar weight
+        "275",      # bench 1RM
+        "",         # bench bar weight
+        "500",      # deadlift 1RM
+        "",         # deadlift bar weight
+        "",         # skip WPU
+        "c",        # review -> continue
+        "",         # week -> all
+        "t",        # text only
+        "",         # save -> skip
+    ])
+    monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+    cli.run_interactive()
+
+    sessions = store.list_sessions()
+    names = [s["name"] for s in sessions]
+    assert "Home Block" not in names
+    assert "Gym Block" in names
+
+
+def test_delete_session_by_name(monkeypatch, tmp_path, no_side_effects):
+    """'del Gym Block' at the session prompt deletes by name."""
+    from tbweightcalc.sessions import SessionStore
+    store = SessionStore(path=tmp_path / "s.json")
+    store.save_session("Home Block", SAVED_LIFTS)
+    store.save_session("Gym Block", SAVED_LIFTS)
+    monkeypatch.setattr(cli, "SessionStore", lambda: store)
+
+    inputs = iter([
+        "del Gym Block",  # delete by name
+        "",               # title -> default
+        "1",              # template -> Classic
+        "455",            # squat 1RM
+        "",               # squat bar weight
+        "275",            # bench 1RM
+        "",               # bench bar weight
+        "500",            # deadlift 1RM
+        "",               # deadlift bar weight
+        "",               # skip WPU
+        "c",              # review -> continue
+        "",               # week -> all
+        "t",              # text only
+        "",               # save -> skip
+    ])
+    monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+    cli.run_interactive()
+
+    sessions = store.list_sessions()
+    names = [s["name"] for s in sessions]
+    assert "Gym Block" not in names
+    assert "Home Block" in names
+
+
+def test_delete_session_not_found(monkeypatch, tmp_path, no_side_effects, capsys):
+    """'del <unknown>' prints an error and continues fresh."""
+    from tbweightcalc.sessions import SessionStore
+    store = SessionStore(path=tmp_path / "s.json")
+    store.save_session("Home Block", SAVED_LIFTS)
+    monkeypatch.setattr(cli, "SessionStore", lambda: store)
+
+    inputs = iter([
+        "del NoSuchSession",  # bad name
+        "",                   # title -> default
+        "1",                  # template -> Classic
+        "455",                # squat 1RM
+        "",                   # squat bar weight
+        "275",                # bench 1RM
+        "",                   # bench bar weight
+        "500",                # deadlift 1RM
+        "",                   # deadlift bar weight
+        "",                   # skip WPU
+        "c",                  # review -> continue
+        "",                   # week -> all
+        "t",                  # text only
+        "n",                  # save -> no
+    ])
+    monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+    cli.run_interactive()
+
+    out = capsys.readouterr().out
+    assert "No session found" in out
+    # Original session untouched
+    assert len(store.list_sessions()) == 1
+
+
+# -------------------------------------------------------------------
+# Test trailing newlines after text output
+# -------------------------------------------------------------------
+
+def test_text_output_ends_with_two_newlines(monkeypatch, tmp_path, no_side_effects, capsys):
+    """Text output is followed by two blank lines."""
+    from tbweightcalc.sessions import SessionStore
+    store = SessionStore(path=tmp_path / "s.json")
+    store.save_session("Home Block", SAVED_LIFTS)
+    monkeypatch.setattr(cli, "SessionStore", lambda: store)
+
+    inputs = iter([
+        "1",    # load session
+        "",     # direct output
+        "",     # week -> all
+        "t",    # text only
+    ])
+    monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+    cli.run_interactive()
+
+    out = capsys.readouterr().out
+    assert out.endswith("\n\n\n")  # program text ends \n, then print() adds \n, print() adds \n
