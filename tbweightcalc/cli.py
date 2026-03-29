@@ -821,26 +821,22 @@ def run_interactive() -> None:
             else:
                 print(f"No session found for '{load_raw}'; starting fresh.")
 
-    # --- Title ---
-    # When editing a saved session, pre-fill its name as the title default.
-    if loaded_session_name:
-        title_prompt = f"\nProgram title (Enter for '{loaded_session_name}'): "
-    else:
-        title_prompt = "\nProgram title (leave blank for default): "
-    raw_title = input(title_prompt).strip()
-    if raw_title:
-        title = raw_title
-    elif loaded_session_name:
-        title = loaded_session_name
-    else:
-        title = f"Tactical Barbell Max Strength: {datetime.date.today():%Y-%m-%d}"
-
     if loaded_from_session:
-        mode = input("\nOutput directly or edit first? [o/e, default o]: ").strip().lower()
+        mode = input("\nEdit or output? [e/o, default o]: ").strip().lower()
         if mode == "e":
+            # --- Title (edit mode only) ---
+            raw_title = input(f"\nProgram title (Enter for '{loaded_session_name}'): ").strip()
+            title = raw_title if raw_title else loaded_session_name
             lifts = _review_and_edit_lifts(lifts, store=store)
-        # else: output directly — use lifts as-is
+        else:
+            title = loaded_session_name
     else:
+        # --- Title ---
+        raw_title = input("\nProgram title (leave blank for default): ").strip()
+        if raw_title:
+            title = raw_title
+        else:
+            title = f"Tactical Barbell Max Strength: {datetime.date.today():%Y-%m-%d}"
         lifts = []
 
         # --- Template selection ---
