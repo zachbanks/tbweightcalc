@@ -1286,3 +1286,105 @@ def test_loaded_session_edit_custom_title(monkeypatch, tmp_path, no_side_effects
     cli.run_interactive()
 
     assert captured["args"].title == "New Title"
+
+
+# -------------------------------------------------------------------
+# Tests for duplicate session
+# -------------------------------------------------------------------
+
+def test_duplicate_session_default_title(monkeypatch, tmp_path, no_side_effects):
+    """Duplicate mode pre-fills title as 'Copy of <session name>'."""
+    from tbweightcalc.sessions import SessionStore
+    store = SessionStore(path=tmp_path / "s.json")
+    store.save_session("Home Block", SAVED_LIFTS)
+    monkeypatch.setattr(cli, "SessionStore", lambda: store)
+
+    inputs = iter([
+        "1",    # load session
+        "d",    # duplicate
+        "",     # title -> accept default "Copy of Home Block"
+        "c",    # review -> continue
+        "",     # week -> all
+        "t",    # text only
+        "",     # save -> accept default title
+    ])
+    monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+    captured = no_side_effects
+    cli.run_interactive()
+
+    assert captured["args"].title == "Copy of Home Block"
+
+
+def test_duplicate_session_custom_title(monkeypatch, tmp_path, no_side_effects):
+    """Duplicate mode accepts a custom title."""
+    from tbweightcalc.sessions import SessionStore
+    store = SessionStore(path=tmp_path / "s.json")
+    store.save_session("Home Block", SAVED_LIFTS)
+    monkeypatch.setattr(cli, "SessionStore", lambda: store)
+
+    inputs = iter([
+        "1",            # load session
+        "d",            # duplicate
+        "Gym Block",    # custom title
+        "c",            # review -> continue
+        "",             # week -> all
+        "t",            # text only
+        "",             # save -> accept default title
+    ])
+    monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+    captured = no_side_effects
+    cli.run_interactive()
+
+    assert captured["args"].title == "Gym Block"
+
+
+def test_duplicate_session_saves_as_new_session(monkeypatch, tmp_path, no_side_effects):
+    """Duplicate saves a new session without touching the original."""
+    from tbweightcalc.sessions import SessionStore
+    store = SessionStore(path=tmp_path / "s.json")
+    store.save_session("Home Block", SAVED_LIFTS)
+    monkeypatch.setattr(cli, "SessionStore", lambda: store)
+
+    inputs = iter([
+        "1",                # load session
+        "d",                # duplicate
+        "",                 # title -> "Copy of Home Block"
+        "c",                # review -> continue
+        "",                 # week -> all
+        "t",                # text only
+        "Copy of Home Block",  # save -> confirm name
+    ])
+    monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+    cli.run_interactive()
+
+    sessions = store.list_sessions()
+    names = [s["name"] for s in sessions]
+    assert "Home Block" in names
+    assert "Copy of Home Block" in names
+    assert len(sessions) == 2
+
+
+def test_duplicate_session_lifts_match_original(monkeypatch, tmp_path, no_side_effects):
+    """Duplicated session carries the same lifts as the original."""
+    from tbweightcalc.sessions import SessionStore
+    store = SessionStore(path=tmp_path / "s.json")
+    store.save_session("Home Block", SAVED_LIFTS)
+    monkeypatch.setattr(cli, "SessionStore", lambda: store)
+
+    inputs = iter([
+        "1",    # load session
+        "d",    # duplicate
+        "",     # title -> "Copy of Home Block"
+        "c",    # review -> continue
+        "",     # week -> all
+        "t",    # text only
+        "",     # save -> skip
+    ])
+    monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+    captured = no_side_effects
+    cli.run_interactive()
+
+    lifts = {l["exercise"]: l for l in captured["args"].lifts}
+    assert lifts["squat"]["one_rm"] == 455
+    assert lifts["bench press"]["one_rm"] == 275
+    assert lifts["deadlift"]["one_rm"] == 500

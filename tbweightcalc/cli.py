@@ -823,11 +823,17 @@ def run_interactive() -> None:
 
     skip_save = False
     if loaded_from_session:
-        mode = input("\nEdit or output? [e/o, default o]: ").strip().lower()
+        mode = input("\nEdit, duplicate, or output? [e/d/o, default o]: ").strip().lower()
         if mode == "e":
             # --- Title (edit mode only) ---
             raw_title = input(f"\nProgram title (Enter for '{loaded_session_name}'): ").strip()
             title = raw_title if raw_title else loaded_session_name
+            lifts = _review_and_edit_lifts(lifts, store=store)
+        elif mode == "d":
+            # --- Duplicate: edit flow, save as a new session ---
+            default_dup_title = f"Copy of {loaded_session_name}"
+            raw_title = input(f"\nProgram title (Enter for '{default_dup_title}'): ").strip()
+            title = raw_title if raw_title else default_dup_title
             lifts = _review_and_edit_lifts(lifts, store=store)
         else:
             title = loaded_session_name
