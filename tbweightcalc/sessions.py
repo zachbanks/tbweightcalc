@@ -49,7 +49,7 @@ class SessionStore:
                 return updated
 
         new_session = {
-            "id": str(uuid.uuid4())[:8],
+            "id": str(uuid.uuid4())[:4],
             "name": name,
             "created": today,
             "lifts": lifts,

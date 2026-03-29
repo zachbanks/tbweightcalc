@@ -801,34 +801,38 @@ def run_interactive() -> None:
     store = SessionStore()
 
     # --- Offer to load a saved session ---
-    sessions = store.list_sessions()
     lifts: list[dict] = []
     loaded_from_session = False
-
     loaded_session_name: str | None = None
 
-    if sessions:
+    while True:
+        sessions = store.list_sessions()
+        if not sessions:
+            break
         print("Saved sessions:")
         _print_sessions(sessions)
         load_raw = input("\nLoad a session (number/name), 'del <number/name>' to delete, or Enter to start fresh: ").strip()
-        if load_raw:
-            if load_raw.lower().startswith("del "):
-                target = load_raw[4:].strip()
-                victim = store.load_session(target)
-                if victim:
-                    store.delete_session(victim["id"])
-                    print(f"[Deleted '{victim['name']}']")
-                else:
-                    print(f"No session found for '{target}'.")
+        if not load_raw:
+            break
+        if load_raw.lower().startswith("del "):
+            target = load_raw[4:].strip()
+            victim = store.load_session(target)
+            if victim:
+                store.delete_session(victim["id"])
+                print(f"[Deleted '{victim['name']}']")
             else:
-                session = store.load_session(load_raw)
-                if session:
-                    lifts = [dict(lift) for lift in session["lifts"]]
-                    loaded_from_session = True
-                    loaded_session_name = session["name"]
-                    print(f"[Loaded '{session['name']}']")
-                else:
-                    print(f"No session found for '{load_raw}'; starting fresh.")
+                print(f"No session found for '{target}'.")
+            # loop back to show updated list
+        else:
+            session = store.load_session(load_raw)
+            if session:
+                lifts = [dict(lift) for lift in session["lifts"]]
+                loaded_from_session = True
+                loaded_session_name = session["name"]
+                print(f"[Loaded '{session['name']}']")
+            else:
+                print(f"No session found for '{load_raw}'; starting fresh.")
+            break
 
     skip_save = False
     if loaded_from_session:
