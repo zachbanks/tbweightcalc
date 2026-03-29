@@ -821,6 +821,7 @@ def run_interactive() -> None:
             else:
                 print(f"No session found for '{load_raw}'; starting fresh.")
 
+    skip_save = False
     if loaded_from_session:
         mode = input("\nEdit or output? [e/o, default o]: ").strip().lower()
         if mode == "e":
@@ -830,6 +831,7 @@ def run_interactive() -> None:
             lifts = _review_and_edit_lifts(lifts, store=store)
         else:
             title = loaded_session_name
+            skip_save = True
     else:
         # --- Title ---
         raw_title = input("\nProgram title (leave blank for default): ").strip()
@@ -1033,7 +1035,8 @@ def run_interactive() -> None:
         print(f"\n[PDF saved to: {pdf_path}]")
 
     # ---------- Save session ----------
-    _prompt_save_session(lifts, store, default_name=title)
+    if not skip_save:
+        _prompt_save_session(lifts, store, default_name=title)
 
 
 # -------------------------------------------------------------------

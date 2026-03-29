@@ -1204,10 +1204,9 @@ def test_loaded_session_direct_output_skips_edit(monkeypatch, tmp_path, no_side_
 
     inputs = iter([
         "1",    # load session 1
-        "",     # edit or output -> default 'o' (direct output, no title prompt)
+        "",     # edit or output -> default 'o' (direct output, no title/save prompts)
         "",     # week -> all
         "t",    # text only
-        "",     # save -> skip
     ])
     monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
     captured = no_side_effects
@@ -1246,7 +1245,7 @@ def test_loaded_session_edit_choice_enters_edit_flow(monkeypatch, tmp_path, no_s
 
 
 def test_loaded_session_direct_output_title_preserved(monkeypatch, tmp_path, no_side_effects):
-    """Session name is used as title when outputting directly (no title prompt)."""
+    """Session name is used as title when outputting directly (no title/save prompts)."""
     from tbweightcalc.sessions import SessionStore
     store = SessionStore(path=tmp_path / "s.json")
     store.save_session("TB2026-04 Home", SAVED_LIFTS)
@@ -1254,10 +1253,9 @@ def test_loaded_session_direct_output_title_preserved(monkeypatch, tmp_path, no_
 
     inputs = iter([
         "1",    # load session
-        "",     # direct output (no title prompt)
+        "",     # direct output (no title prompt, no save prompt)
         "",     # week -> all
         "t",    # text only
-        "",     # save -> skip
     ])
     monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
     captured = no_side_effects
