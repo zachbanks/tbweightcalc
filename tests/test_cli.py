@@ -1581,6 +1581,15 @@ class TestApplyLiftAdjustment:
         result = cli._apply_lift_adjustment(lifts, 10.0)
         assert result[0]["body_weight"] == 212
 
+    def test_wpu_applies_pct_to_added_portion_not_full_1rm(self):
+        # WPU: 1RM=286, BW=212 → added portion = 74#
+        # +5% on added portion: round(74 * 1.05) = 78 → new 1RM = 212 + 78 = 290
+        # NOT round(286 * 1.05) = 300 (which would be wrong)
+        lifts = [{"exercise": "weighted pullup", "one_rm": 286, "body_weight": 212, "bar_weight": 45.0, "bar_label": None}]
+        result = cli._apply_lift_adjustment(lifts, 5.0)
+        assert result[0]["one_rm"] == 212 + round(74 * 1.05)   # 290
+        assert result[0]["one_rm"] != round(286 * 1.05)        # not 300
+
     def test_zero_pct_no_change(self):
         result = cli._apply_lift_adjustment(self.LIFTS, 0.0)
         for orig, adj in zip(self.LIFTS, result):

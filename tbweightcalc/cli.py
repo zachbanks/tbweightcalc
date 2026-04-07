@@ -786,7 +786,11 @@ _ADJUSTMENT_PRESETS = [
 def _apply_lift_adjustment(lifts: list[dict], pct: float, exercise: str | None = None) -> list[dict]:
     """Return a new lifts list with one_rm values scaled by pct%.
 
-    If exercise is given (case-insensitive), only that lift is adjusted.
+    For WPU lifts (body_weight is set), the % is applied to the added-weight
+    portion only (one_rm - body_weight), so the displayed working weights scale
+    proportionally rather than being amplified by the bodyweight offset.
+
+    For all other lifts the % is applied to the full one_rm.
     body_weight is never modified.
     """
     result = []
@@ -794,7 +798,13 @@ def _apply_lift_adjustment(lifts: list[dict], pct: float, exercise: str | None =
         l = dict(lift)
         if exercise is None or l["exercise"].lower() == exercise.lower():
             if l.get("one_rm") is not None:
-                l["one_rm"] = round(l["one_rm"] * (1 + pct / 100))
+                bw = l.get("body_weight")
+                if bw is not None:
+                    # WPU: scale only the added-weight portion
+                    added = l["one_rm"] - bw
+                    l["one_rm"] = bw + round(added * (1 + pct / 100))
+                else:
+                    l["one_rm"] = round(l["one_rm"] * (1 + pct / 100))
         result.append(l)
     return result
 
