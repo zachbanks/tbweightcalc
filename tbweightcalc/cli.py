@@ -773,6 +773,85 @@ def _prompt_save_session(lifts: list[dict], store: SessionStore, default_name: s
     print(f"[{action} session '{session['name']}' ({session['id']})]")
 
 
+_ADJUSTMENT_PRESETS = [
+    ("+2.5%",  2.5),
+    ("+5%",    5.0),
+    ("+10%",  10.0),
+    ("-2.5%", -2.5),
+    ("-5%",   -5.0),
+    ("-10%", -10.0),
+]
+
+
+def _apply_lift_adjustment(lifts: list[dict], pct: float, exercise: str | None = None) -> list[dict]:
+    """Return a new lifts list with one_rm values scaled by pct%.
+
+    If exercise is given (case-insensitive), only that lift is adjusted.
+    body_weight is never modified.
+    """
+    result = []
+    for lift in lifts:
+        l = dict(lift)
+        if exercise is None or l["exercise"].lower() == exercise.lower():
+            if l.get("one_rm") is not None:
+                l["one_rm"] = round(l["one_rm"] * (1 + pct / 100))
+        result.append(l)
+    return result
+
+
+def _prompt_adjustment(lifts: list[dict]) -> list[dict]:
+    """Offer preset or custom % adjustment to 1RM values, globally or per-exercise."""
+    print("\nAdjust 1RMs:")
+    labels = "  ".join(f"[{i}] {label}" for i, (label, _) in enumerate(_ADJUSTMENT_PRESETS, 1))
+    print(f"  {labels}  [7] Custom")
+    raw = input("Choice (Enter to skip): ").strip()
+    if not raw:
+        return lifts
+
+    pct: float | None = None
+    if raw.isdigit() and 1 <= int(raw) <= 6:
+        pct = _ADJUSTMENT_PRESETS[int(raw) - 1][1]
+    elif raw == "7":
+        custom = input("Enter % (e.g. 7.5 or -3): ").strip()
+        try:
+            pct = float(custom)
+        except ValueError:
+            print("Invalid percentage; skipping adjustment.")
+            return lifts
+    else:
+        try:
+            pct = float(raw)
+        except ValueError:
+            print("Invalid choice; skipping adjustment.")
+            return lifts
+
+    # --- Scope ---
+    exercises = [l["exercise"] for l in lifts]
+    print("\nApply to:")
+    print("  [Enter] All lifts")
+    for i, ex in enumerate(exercises, 1):
+        orm = lifts[i - 1].get("one_rm")
+        print(f"  [{i}] {format_exercise_name(ex)} (1RM: {orm})")
+    scope = input("Choice (Enter for all): ").strip()
+
+    exercise: str | None = None
+    if scope:
+        try:
+            idx = int(scope)
+            if 1 <= idx <= len(exercises):
+                exercise = exercises[idx - 1]
+        except ValueError:
+            for ex in exercises:
+                if scope.lower() in ex.lower():
+                    exercise = ex
+                    break
+
+    adjusted = _apply_lift_adjustment(lifts, pct, exercise)
+    target = f"'{exercise}'" if exercise else "all lifts"
+    print(f"[Applied {pct:+.4g}% to {target}]")
+    return adjusted
+
+
 def _print_sessions(sessions: list[dict]) -> None:
     if not sessions:
         print("  (no saved sessions)")
@@ -843,10 +922,11 @@ def run_interactive() -> None:
             title = raw_title if raw_title else loaded_session_name
             lifts = _review_and_edit_lifts(lifts, store=store)
         elif mode == "d":
-            # --- Duplicate: edit flow, save as a new session ---
+            # --- Duplicate: adjust, edit flow, save as a new session ---
             default_dup_title = f"Copy of {loaded_session_name}"
             raw_title = input(f"\nProgram title (Enter for '{default_dup_title}'): ").strip()
             title = raw_title if raw_title else default_dup_title
+            lifts = _prompt_adjustment(lifts)
             lifts = _review_and_edit_lifts(lifts, store=store)
         else:
             title = loaded_session_name
