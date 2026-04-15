@@ -262,7 +262,7 @@ class ActionScreen(Screen):
         Binding("o", "quick_output", "Output"),
         Binding("e", "quick_edit", "Edit"),
         Binding("d", "quick_duplicate", "Duplicate"),
-        Binding("ctrl+enter", "go_continue", "Continue"),
+        Binding("enter", "go_continue", "Continue", priority=True),
     ]
 
     def compose(self) -> ComposeResult:
@@ -278,7 +278,7 @@ class ActionScreen(Screen):
                 yield RadioButton("Duplicate with modifications", id="r-duplicate")
         with Horizontal(classes="btn-row"):
             yield Button("Back", id="btn-back", variant="default")
-            yield Button("Continue [ctrl+↵]", id="btn-continue", variant="primary")
+            yield Button("Continue [↵]", id="btn-continue", variant="primary")
         yield Footer()
 
     @on(Button.Pressed, "#btn-back")
