@@ -1057,16 +1057,14 @@ class TBCalcApp(App):
         self.push_screen(HomeScreen())
 
     def pop_screen_all(self) -> None:
-        """Pop back to the root HomeScreen and refresh."""
-        while len(self.screen_stack) > 1:
+        """Pop back to HomeScreen one screen per refresh cycle."""
+        top = self.screen_stack[-1] if self.screen_stack else None
+        if isinstance(top, HomeScreen):
+            top._refresh_list()
+            return
+        if len(self.screen_stack) > 1:
             self.pop_screen()
-        # Refresh home session list
-        try:
-            home = self.screen_stack[0]
-            if isinstance(home, HomeScreen):
-                home._refresh_list()
-        except Exception:
-            pass
+            self.call_after_refresh(self.pop_screen_all)
 
 
 def run_tui() -> None:
