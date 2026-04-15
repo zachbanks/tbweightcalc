@@ -262,7 +262,7 @@ class ActionScreen(Screen):
         Binding("o", "quick_output", "Output"),
         Binding("e", "quick_edit", "Edit"),
         Binding("d", "quick_duplicate", "Duplicate"),
-        Binding("enter", "go_continue", "Continue", show=False),
+        Binding("ctrl+enter", "go_continue", "Continue"),
     ]
 
     def compose(self) -> ComposeResult:
@@ -270,15 +270,15 @@ class ActionScreen(Screen):
         yield Header(show_clock=False)
         yield Static(f"Loaded: {state.loaded_session_name}", classes="screen-title")
         yield Rule()
-        yield Static("What would you like to do?", classes="section-label")
+        yield Static("Press o / e / d to jump straight to that action.", classes="section-label")
         with Container(classes="card"):
             with RadioSet(id="action-radio"):
-                yield RadioButton("[O]utput program directly", id="r-output", value=True)
-                yield RadioButton("[E]dit and save", id="r-edit")
-                yield RadioButton("[D]uplicate with modifications", id="r-duplicate")
+                yield RadioButton("Output program directly", id="r-output", value=True)
+                yield RadioButton("Edit and save", id="r-edit")
+                yield RadioButton("Duplicate with modifications", id="r-duplicate")
         with Horizontal(classes="btn-row"):
             yield Button("Back", id="btn-back", variant="default")
-            yield Button("Continue [↵]", id="btn-continue", variant="primary")
+            yield Button("Continue [ctrl+↵]", id="btn-continue", variant="primary")
         yield Footer()
 
     @on(Button.Pressed, "#btn-back")
