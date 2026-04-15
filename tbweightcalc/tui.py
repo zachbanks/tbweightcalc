@@ -8,6 +8,7 @@ from typing import Optional
 
 from textual import on
 from textual.app import App, ComposeResult
+from textual.binding import Binding
 from textual.containers import Container, Horizontal, Vertical, ScrollableContainer
 from textual.screen import Screen, ModalScreen
 from textual.widgets import (
@@ -174,7 +175,13 @@ class AppState:
 class HomeScreen(Screen):
     """Session list — entry point of the app."""
 
-    BINDINGS = [("q", "quit", "Quit"), ("n", "new_program", "New")]
+    BINDINGS = [
+        Binding("n", "new_program", "New"),
+        Binding("l", "load_selected", "Load"),
+        Binding("enter", "load_selected", "Open", show=False),
+        Binding("delete", "delete_selected", "Delete", show=False),
+        Binding("d", "delete_selected", "Delete"),
+    ]
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
@@ -184,9 +191,9 @@ class HomeScreen(Screen):
         yield ListView(id="session-list")
         yield Rule()
         with Horizontal(classes="btn-row"):
-            yield Button("New Program", id="btn-new", variant="primary")
-            yield Button("Load", id="btn-load", variant="default")
-            yield Button("Delete", id="btn-delete", variant="error")
+            yield Button("New [n]", id="btn-new", variant="primary")
+            yield Button("Load [l]", id="btn-load", variant="default")
+            yield Button("Delete [d]", id="btn-delete", variant="error")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -222,7 +229,7 @@ class HomeScreen(Screen):
         self.app.push_screen(SetupScreen())
 
     @on(Button.Pressed, "#btn-load")
-    def load_selected(self) -> None:
+    def action_load_selected(self) -> None:
         idx = self._selected_index()
         if idx is None:
             self.notify("Select a session first.", severity="warning")
@@ -235,7 +242,7 @@ class HomeScreen(Screen):
         self.app.push_screen(ActionScreen())
 
     @on(Button.Pressed, "#btn-delete")
-    def delete_selected(self) -> None:
+    def action_delete_selected(self) -> None:
         idx = self._selected_index()
         if idx is None:
             self.notify("Select a session to delete.", severity="warning")
@@ -250,7 +257,13 @@ class HomeScreen(Screen):
 class ActionScreen(Screen):
     """Choose what to do with a loaded session: output / edit / duplicate."""
 
-    BINDINGS = [("escape", "app.pop_screen", "Back")]
+    BINDINGS = [
+        Binding("escape", "app.pop_screen", "Back"),
+        Binding("o", "quick_output", "Output"),
+        Binding("e", "quick_edit", "Edit"),
+        Binding("d", "quick_duplicate", "Duplicate"),
+        Binding("enter", "go_continue", "Continue", show=False),
+    ]
 
     def compose(self) -> ComposeResult:
         state = self.app.state
@@ -260,27 +273,42 @@ class ActionScreen(Screen):
         yield Static("What would you like to do?", classes="section-label")
         with Container(classes="card"):
             with RadioSet(id="action-radio"):
-                yield RadioButton("Output program directly", id="r-output", value=True)
-                yield RadioButton("Edit and save", id="r-edit")
-                yield RadioButton("Duplicate with modifications", id="r-duplicate")
+                yield RadioButton("[O]utput program directly", id="r-output", value=True)
+                yield RadioButton("[E]dit and save", id="r-edit")
+                yield RadioButton("[D]uplicate with modifications", id="r-duplicate")
         with Horizontal(classes="btn-row"):
             yield Button("Back", id="btn-back", variant="default")
-            yield Button("Continue", id="btn-continue", variant="primary")
+            yield Button("Continue [↵]", id="btn-continue", variant="primary")
         yield Footer()
 
     @on(Button.Pressed, "#btn-back")
     def go_back(self) -> None:
         self.app.pop_screen()
 
-    @on(Button.Pressed, "#btn-continue")
-    def go_continue(self) -> None:
+    def action_quick_output(self) -> None:
+        self.query_one("#r-output", RadioButton).value = True
+        self._do_continue("r-output")
+
+    def action_quick_edit(self) -> None:
+        self.query_one("#r-edit", RadioButton).value = True
+        self._do_continue("r-edit")
+
+    def action_quick_duplicate(self) -> None:
+        self.query_one("#r-duplicate", RadioButton).value = True
+        self._do_continue("r-duplicate")
+
+    def action_go_continue(self) -> None:
         rs = self.query_one("#action-radio", RadioSet)
         pressed = rs.pressed_button
-        if pressed is None:
-            return
-        bid = pressed.id
-        state = self.app.state
+        bid = pressed.id if pressed else "r-output"
+        self._do_continue(bid)
 
+    @on(Button.Pressed, "#btn-continue")
+    def go_continue(self) -> None:
+        self.action_go_continue()
+
+    def _do_continue(self, bid: str) -> None:
+        state = self.app.state
         if bid == "r-output":
             state.mode = "output"
             state.title = state.loaded_session_name or ""
@@ -299,7 +327,10 @@ class ActionScreen(Screen):
 class SetupScreen(Screen):
     """Enter program title and choose template."""
 
-    BINDINGS = [("escape", "app.pop_screen", "Back")]
+    BINDINGS = [
+        Binding("escape", "app.pop_screen", "Back"),
+        Binding("ctrl+enter", "go_next", "Next"),
+    ]
 
     def __init__(self, title_only: bool = False, duplicate: bool = False):
         super().__init__()
@@ -335,7 +366,7 @@ class SetupScreen(Screen):
 
         with Horizontal(classes="btn-row"):
             yield Button("Back", id="btn-back", variant="default")
-            yield Button("Next", id="btn-next", variant="primary")
+            yield Button("Next [ctrl+↵]", id="btn-next", variant="primary")
         yield Footer()
 
     @on(Button.Pressed, "#btn-back")
@@ -343,7 +374,7 @@ class SetupScreen(Screen):
         self.app.pop_screen()
 
     @on(Button.Pressed, "#btn-next")
-    def go_next(self) -> None:
+    def action_go_next(self) -> None:
         state = self.app.state
         state.title = self.query_one("#title-input", Input).value.strip()
         if not state.title:
@@ -374,7 +405,10 @@ class SetupScreen(Screen):
 class LiftEntryScreen(Screen):
     """Enter 1RM for each lift in the chosen preset template."""
 
-    BINDINGS = [("escape", "app.pop_screen", "Back")]
+    BINDINGS = [
+        Binding("escape", "app.pop_screen", "Back"),
+        Binding("ctrl+enter", "go_next", "Next"),
+    ]
 
     def __init__(self) -> None:
         super().__init__()
@@ -411,7 +445,7 @@ class LiftEntryScreen(Screen):
 
         with Horizontal(classes="btn-row"):
             yield Button("Back", id="btn-back", variant="default")
-            yield Button("Next", id="btn-next", variant="primary")
+            yield Button("Next [ctrl+↵]", id="btn-next", variant="primary")
         yield Footer()
 
     def _val(self, widget_id: str) -> str:
@@ -425,7 +459,7 @@ class LiftEntryScreen(Screen):
         self.app.pop_screen()
 
     @on(Button.Pressed, "#btn-next")
-    def go_next(self) -> None:
+    def action_go_next(self) -> None:
         state = self.app.state
         exercises = TEMPLATES[state.template]["exercises"]
         lifts: list[dict] = []
@@ -485,7 +519,10 @@ class LiftEntryScreen(Screen):
 class CustomLiftScreen(Screen):
     """Template 4: slot-based custom exercise selection."""
 
-    BINDINGS = [("escape", "app.pop_screen", "Back")]
+    BINDINGS = [
+        Binding("escape", "app.pop_screen", "Back"),
+        Binding("ctrl+enter", "go_next", "Next"),
+    ]
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
@@ -520,7 +557,7 @@ class CustomLiftScreen(Screen):
 
         with Horizontal(classes="btn-row"):
             yield Button("Back", id="btn-back", variant="default")
-            yield Button("Next", id="btn-next", variant="primary")
+            yield Button("Next [ctrl+↵]", id="btn-next", variant="primary")
         yield Footer()
 
     def _val(self, widget_id: str) -> str:
@@ -534,7 +571,7 @@ class CustomLiftScreen(Screen):
         self.app.pop_screen()
 
     @on(Button.Pressed, "#btn-next")
-    def go_next(self) -> None:
+    def action_go_next(self) -> None:
         state = self.app.state
         lifts: list[dict] = []
 
@@ -602,7 +639,10 @@ class CustomLiftScreen(Screen):
 class AdjustmentScreen(Screen):
     """Choose a % adjustment for duplicate mode (applied before review)."""
 
-    BINDINGS = [("escape", "app.pop_screen", "Back")]
+    BINDINGS = [
+        Binding("escape", "app.pop_screen", "Back"),
+        Binding("ctrl+enter", "go_next", "Next"),
+    ]
 
     def compose(self) -> ComposeResult:
         state = self.app.state
@@ -630,7 +670,7 @@ class AdjustmentScreen(Screen):
 
         with Horizontal(classes="btn-row"):
             yield Button("Back", id="btn-back", variant="default")
-            yield Button("Next", id="btn-next", variant="primary")
+            yield Button("Next [ctrl+↵]", id="btn-next", variant="primary")
         yield Footer()
 
     @on(Button.Pressed, "#btn-back")
@@ -638,7 +678,7 @@ class AdjustmentScreen(Screen):
         self.app.pop_screen()
 
     @on(Button.Pressed, "#btn-next")
-    def go_next(self) -> None:
+    def action_go_next(self) -> None:
         state = self.app.state
         rs = self.query_one("#preset-radio", RadioSet)
         pressed = rs.pressed_button
@@ -682,6 +722,11 @@ class AdjustmentScreen(Screen):
 
 class EditLiftModal(ModalScreen):
     """Modal to edit a single lift's 1RM in the review screen."""
+
+    BINDINGS = [Binding("escape", "dismiss_modal", "Cancel", show=False)]
+
+    def action_dismiss_modal(self) -> None:
+        self.dismiss(False)
 
     def __init__(self, lift_idx: int):
         super().__init__()
@@ -760,18 +805,22 @@ class EditLiftModal(ModalScreen):
 class ReviewScreen(Screen):
     """Review all entered lifts; click a row to edit."""
 
-    BINDINGS = [("escape", "app.pop_screen", "Back")]
+    BINDINGS = [
+        Binding("escape", "app.pop_screen", "Back"),
+        Binding("e", "edit_selected", "Edit row"),
+        Binding("ctrl+enter", "go_continue", "Continue"),
+    ]
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
         yield Static("Review Lifts", classes="screen-title")
         yield Rule()
-        yield Static("Click a row to edit it.", classes="section-label")
+        yield Static("Select row + [e] to edit  •  [ctrl+↵] to continue.", classes="section-label")
         yield DataTable(id="lift-table", cursor_type="row")
         with Horizontal(classes="btn-row"):
             yield Button("Back", id="btn-back", variant="default")
-            yield Button("Edit Selected", id="btn-edit", variant="default")
-            yield Button("Continue", id="btn-continue", variant="primary")
+            yield Button("Edit [e]", id="btn-edit", variant="default")
+            yield Button("Continue [ctrl+↵]", id="btn-continue", variant="primary")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -795,7 +844,7 @@ class ReviewScreen(Screen):
         self.app.pop_screen()
 
     @on(Button.Pressed, "#btn-edit")
-    def edit_selected(self) -> None:
+    def action_edit_selected(self) -> None:
         table = self.query_one("#lift-table", DataTable)
         row = table.cursor_row
         if row < 0 or row >= len(self.app.state.lifts):
@@ -815,14 +864,18 @@ class ReviewScreen(Screen):
         self.app.push_screen(EditLiftModal(row), on_close)
 
     @on(Button.Pressed, "#btn-continue")
-    def go_continue(self) -> None:
+    def action_go_continue(self) -> None:
         self.app.push_screen(GenerateScreen())
 
 
 class GenerateScreen(Screen):
     """Choose week and output mode, then generate."""
 
-    BINDINGS = [("escape", "app.pop_screen", "Back")]
+    BINDINGS = [
+        Binding("escape", "app.pop_screen", "Back"),
+        Binding("enter", "generate", "Generate", show=False),
+        Binding("g", "generate", "Generate"),
+    ]
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
@@ -847,7 +900,7 @@ class GenerateScreen(Screen):
             state = self.app.state
             if not state.skip_save:
                 yield Button("Back", id="btn-back", variant="default")
-            yield Button("Generate", id="btn-generate", variant="primary")
+            yield Button("Generate [g]", id="btn-generate", variant="primary")
         yield Footer()
 
     @on(Button.Pressed, "#btn-back")
@@ -855,7 +908,7 @@ class GenerateScreen(Screen):
         self.app.pop_screen()
 
     @on(Button.Pressed, "#btn-generate")
-    def generate(self) -> None:
+    def action_generate(self) -> None:
         state = self.app.state
 
         week_rs = self.query_one("#week-radio", RadioSet)
@@ -874,7 +927,13 @@ class GenerateScreen(Screen):
 class OutputScreen(Screen):
     """Display the generated program with copy/PDF/save options."""
 
-    BINDINGS = [("escape", "go_done", "Done")]
+    BINDINGS = [
+        Binding("c", "copy", "Copy", priority=True),
+        Binding("p", "save_pdf", "PDF", priority=True),
+        Binding("s", "save_session", "Save", priority=True),
+        Binding("escape", "go_done", "Done"),
+        Binding("q", "go_done", "Done", show=False),
+    ]
 
     def compose(self) -> ComposeResult:
         state = self.app.state
@@ -884,11 +943,11 @@ class OutputScreen(Screen):
         yield TextArea(id="output-area", read_only=True)
         with Horizontal(classes="btn-row"):
             if not state.skip_save:
-                yield Button("Save Session", id="btn-save-session", variant="default")
-            yield Button("Copy", id="btn-copy", variant="default")
+                yield Button("Save [s]", id="btn-save-session", variant="default")
+            yield Button("Copy [c]", id="btn-copy", variant="default")
             if state.out_mode in ("p", "b"):
-                yield Button("Save PDF", id="btn-pdf", variant="default")
-            yield Button("Done", id="btn-done", variant="primary")
+                yield Button("PDF [p]", id="btn-pdf", variant="default")
+            yield Button("Done [esc]", id="btn-done", variant="primary")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -925,30 +984,31 @@ class OutputScreen(Screen):
             self.notify(f"PDF failed: {e}", severity="error")
 
     @on(Button.Pressed, "#btn-copy")
-    def do_copy(self) -> None:
+    def action_copy(self) -> None:
         copy_to_clipboard(self._program_text)
         self.notify("Copied to clipboard.")
 
     @on(Button.Pressed, "#btn-pdf")
-    def do_pdf(self) -> None:
+    def action_save_pdf(self) -> None:
         self._save_pdf()
 
     @on(Button.Pressed, "#btn-save-session")
-    def do_save_session(self) -> None:
-        state = self.app.state
+    def action_save_session(self) -> None:
         self.app.push_screen(SaveSessionModal())
 
     @on(Button.Pressed, "#btn-done")
-    def go_done(self) -> None:
-        # Pop all the way back to HomeScreen
-        self.app.pop_screen_all()
-
     def action_go_done(self) -> None:
+        # Pop all the way back to HomeScreen
         self.app.pop_screen_all()
 
 
 class SaveSessionModal(ModalScreen):
     """Modal prompt to name and save the current session."""
+
+    BINDINGS = [Binding("escape", "dismiss_modal", "Cancel", show=False)]
+
+    def action_dismiss_modal(self) -> None:
+        self.dismiss(None)
 
     def compose(self) -> ComposeResult:
         state = self.app.state
@@ -986,6 +1046,8 @@ class TBCalcApp(App):
 
     CSS = CSS
     TITLE = "Tactical Barbell"
+    # q quits from any screen that doesn't consume it (i.e. not inside an Input/TextArea)
+    BINDINGS = [Binding("q", "quit", "Quit")]
 
     def __init__(self):
         super().__init__()
