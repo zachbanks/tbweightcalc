@@ -1258,13 +1258,10 @@ def main() -> None:
         help="Delete a saved custom bar by name and exit",
     )
 
-    # No arguments at all -> full interactive program mode
+    # No arguments at all -> full TUI mode
     if len(sys.argv) == 1:
-        try:
-            run_interactive()
-        except KeyboardInterrupt:
-            # Clean, quiet exit on Ctrl-C
-            print("\n[Aborted by user]")
+        from tbweightcalc.tui import run_tui
+        run_tui()
         return
 
     args = parser.parse_args()

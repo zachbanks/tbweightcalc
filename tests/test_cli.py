@@ -237,23 +237,26 @@ def test_main_uses_default_title_when_not_provided(monkeypatch, capsys, tmp_path
     assert pdf_path.exists()
 
 
-def test_main_calls_run_interactive_when_no_args(monkeypatch):
+def test_main_calls_run_tui_when_no_args(monkeypatch):
     """
     When tbcalc is run with no CLI arguments (other than the program name),
-    main() should call run_interactive() instead of parsing flags.
+    main() should launch the TUI instead of parsing flags.
     """
-    called = {"run_interactive": False}
+    from tbweightcalc import tui as _tui_mod
 
-    def fake_run_interactive():
-        called["run_interactive"] = True
+    called = {"run_tui": False}
 
-    # Pretend we invoked "tbcalc" with no extra args
-    monkeypatch.setattr(cli, "run_interactive", fake_run_interactive)
+    def fake_run_tui():
+        called["run_tui"] = True
+
+    # Patch run_tui on the already-imported tui module so the inline
+    # "from tbweightcalc.tui import run_tui" inside main() picks it up.
+    monkeypatch.setattr(_tui_mod, "run_tui", fake_run_tui)
     monkeypatch.setattr(sys, "argv", ["tbcalc"])
 
     cli.main()
 
-    assert called["run_interactive"] is True
+    assert called["run_tui"] is True
 
 
 # -------------------------------------------------------------------
