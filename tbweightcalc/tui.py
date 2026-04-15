@@ -199,6 +199,10 @@ class HomeScreen(Screen):
     def on_mount(self) -> None:
         self._refresh_list()
 
+    def on_show(self) -> None:
+        """Refresh session list every time this screen becomes active."""
+        self._refresh_list()
+
     def _refresh_list(self) -> None:
         lv = self.query_one("#session-list", ListView)
         lv.clear()
@@ -950,6 +954,9 @@ class OutputScreen(Screen):
             yield Button("Done [esc]", id="btn-done", variant="primary")
         yield Footer()
 
+    # Initialised in on_mount; guard against AttributeError if copy pressed early
+    _program_text: str = ""
+
     def on_mount(self) -> None:
         state = self.app.state
         args = argparse.Namespace(
@@ -966,9 +973,14 @@ class OutputScreen(Screen):
         ta = self.query_one("#output-area", TextArea)
         ta.load_text(self._program_text)
 
-        # Auto-copy and auto-PDF if mode set
+        # Run clipboard/PDF after the screen has rendered so we don't block the UI
+        self.call_after_refresh(self._auto_output)
+
+    def _auto_output(self) -> None:
+        state = self.app.state
         if state.out_mode in ("t", "b"):
             copy_to_clipboard(self._program_text)
+            self.notify("Copied to clipboard.")
         if state.out_mode in ("p", "b"):
             self._save_pdf()
 
@@ -1057,14 +1069,18 @@ class TBCalcApp(App):
         self.push_screen(HomeScreen())
 
     def pop_screen_all(self) -> None:
-        """Pop back to HomeScreen one screen per refresh cycle."""
-        top = self.screen_stack[-1] if self.screen_stack else None
-        if isinstance(top, HomeScreen):
-            top._refresh_list()
+        """Pop all screens above HomeScreen using Textual's built-in _pop_to_screen."""
+        home = next((s for s in self.screen_stack if isinstance(s, HomeScreen)), None)
+        if home is None:
+            # No HomeScreen found — push a fresh one
+            self.push_screen(HomeScreen())
             return
-        if len(self.screen_stack) > 1:
-            self.pop_screen()
-            self.call_after_refresh(self.pop_screen_all)
+        if self.screen_stack[-1] is home:
+            home._refresh_list()
+            return
+        # _pop_to_screen pops asynchronously via call_later + batch_update;
+        # on_show on HomeScreen will refresh the list when it becomes active.
+        self._pop_to_screen(home)
 
 
 def run_tui() -> None:
