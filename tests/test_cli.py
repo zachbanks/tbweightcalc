@@ -369,6 +369,54 @@ class TestParseOneRmString:
         assert cli.parse_one_rm_string("240.5 5") == 281
         assert cli.parse_one_rm_string("240.5x5") == 281
 
+    def test_math_expression_percentage_addition(self):
+        # 240 + 10% -> 240 + 24 = 264
+        assert cli.parse_one_rm_string("240 + 10%") == 264
+        assert cli.parse_one_rm_string("240+10%") == 264
+        assert cli.parse_one_rm_string("240 +10%") == 264
+        assert cli.parse_one_rm_string("240+ 10%") == 264
+
+    def test_math_expression_percentage_subtraction(self):
+        # 240 - 5% -> 240 - 12 = 228
+        assert cli.parse_one_rm_string("240 - 5%") == 228
+        assert cli.parse_one_rm_string("240-5%") == 228
+        assert cli.parse_one_rm_string("240 -5%") == 228
+        assert cli.parse_one_rm_string("240- 5%") == 228
+
+    def test_math_expression_absolute_addition(self):
+        # 240 + 20 -> 260
+        assert cli.parse_one_rm_string("240 + 20") == 260
+        assert cli.parse_one_rm_string("240+20") == 260
+        # With 'lbs' suffix
+        assert cli.parse_one_rm_string("240 + 20 lbs") == 260
+        assert cli.parse_one_rm_string("240+20lbs") == 260
+        assert cli.parse_one_rm_string("240 + 20 lb") == 260
+
+    def test_math_expression_absolute_subtraction(self):
+        # 240 - 10 -> 230
+        assert cli.parse_one_rm_string("240 - 10") == 230
+        assert cli.parse_one_rm_string("240-10") == 230
+        # With 'lbs' suffix
+        assert cli.parse_one_rm_string("240 - 10 lbs") == 230
+        assert cli.parse_one_rm_string("240-10lbs") == 230
+        assert cli.parse_one_rm_string("240 - 10 lb") == 230
+
+    def test_math_expression_with_decimals(self):
+        # 240.5 + 10% -> 240.5 + 24.05 = 264.55 -> 265
+        assert cli.parse_one_rm_string("240.5 + 10%") == 265
+        # 240 + 5.5 -> 245.5 -> 246
+        assert cli.parse_one_rm_string("240 + 5.5") == 246
+        # 240 - 2.3% -> 240 - 5.52 = 234.48 -> 234
+        assert cli.parse_one_rm_string("240 - 2.3%") == 234
+
+    def test_math_expression_edge_cases(self):
+        # Large percentage
+        assert cli.parse_one_rm_string("200 + 50%") == 300
+        # Small percentage
+        assert cli.parse_one_rm_string("100 + 1%") == 101
+        # Subtraction that results in lower value
+        assert cli.parse_one_rm_string("300 - 100") == 200
+
 
 # -------------------------------------------------------------------
 # Tests for math expression support in parse_one_rm_string
@@ -664,23 +712,22 @@ def test_interactive_template_classic_builds_expected_lifts(
     # 1.  title (blank -> default)
     # 2.  template = "1"
     # 3.  squat 1RM
-    # 4.  squat bar weight (blank -> 45)
-    # 5.  squat bar label (blank -> none)
-    # 6.  bench 1RM
-    # 7.  bench bar weight (blank -> 45)
-    # 8.  bench bar label (blank -> none)
-    # 9.  deadlift 1RM
-    # 10. deadlift bar weight (blank -> 45)
-    # 11. deadlift bar label (blank -> none)
-    # 12. WPU bodyweight (blank -> skip)
-    # 13. week (blank -> all)
-    # 14. output mode "t" (text only)
+    # 4.  squat bar weight (blank -> 45, no label prompt when blank)
+    # 5.  bench 1RM
+    # 6.  bench bar weight (blank -> 45)
+    # 7.  deadlift 1RM
+    # 8.  deadlift bar weight (blank -> 45)
+    # 9.  WPU bodyweight (blank -> skip)
+    # 10. review -> continue
+    # 11. week (blank -> all)
+    # 12. output mode "t" (text only)
+    # 13. save session (blank -> skip)
     inputs = iter(
         [
             "",  # title
             "1",  # template choice -> Classic
             "455",  # squat 1RM
-            "",  # squat bar weight -> default 45 (blank returns immediately, no label prompt)
+            "",  # squat bar weight -> default 45 (blank = default, no label prompt)
             "315",  # bench 1RM
             "",  # bench bar weight -> default 45
             "500",  # deadlift 1RM
@@ -723,7 +770,7 @@ def test_interactive_template_front_squat_block_builds_expected_lifts(
             "FS Block",  # title
             "2",  # template choice -> Front-squat Block
             "355",  # front squat 1RM
-            "",  # front squat bar weight -> default 45
+            "",  # front squat bar weight -> default 45 (blank = default, no label prompt)
             "185",  # overhead press 1RM
             "",  # overhead press bar weight -> default 45
             "495",  # deadlift 1RM
@@ -770,7 +817,7 @@ def test_interactive_template_zercher_block_builds_expected_lifts(
             "Zercher Block",  # title
             "3",  # template choice -> Zercher Block
             "315",  # zercher squat 1RM
-            "",  # zercher squat bar weight -> default 45
+            "",  # zercher squat bar weight -> default 45 (blank = default, no label prompt)
             "225",  # bench press 1RM
             "",  # bench press bar weight -> default 45
             "405",  # deadlift 1RM
@@ -794,9 +841,11 @@ def test_interactive_template_zercher_block_builds_expected_lifts(
     lifts = {l["exercise"]: l for l in args.lifts}
 
     assert "squat" not in lifts
+    assert "front squat" not in lifts
     assert lifts["zercher squat"]["one_rm"] == 315
     assert lifts["bench press"]["one_rm"] == 225
     assert lifts["deadlift"]["one_rm"] == 405
+    # No WPU because we skipped BW
     assert "weighted pullup" not in lifts
 
 
@@ -815,7 +864,7 @@ def test_interactive_template_custom_with_extra_exercises(
             # Lower-body main lift slot
             "1",  # choose squat
             "455",  # squat 1RM
-            "",  # squat bar weight -> default 45 (blank returns immediately)
+            "",  # squat bar weight -> default 45 (blank = default, no label prompt)
             # Upper-body main press slot
             "1",  # choose bench press
             "315",  # bench 1RM

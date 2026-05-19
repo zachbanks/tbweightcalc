@@ -309,6 +309,8 @@ def evaluate_weight_expression(base_weight: float, expression: str) -> float:
     Raises ValueError if the expression cannot be parsed.
     """
     expr = expression.strip()
+
+    # Match pattern: operator (+ or -), number, optional % or lbs
     match = re.match(r'^([+\-])\s*(\d+(?:\.\d+)?)\s*(%|lbs?)?$', expr, re.IGNORECASE)
     if not match:
         raise ValueError(f"Invalid expression: {expression}")
@@ -318,13 +320,15 @@ def evaluate_weight_expression(base_weight: float, expression: str) -> float:
     unit = match.group(3)
 
     if unit and unit.strip().lower().startswith('%'):
+        # Percentage calculation
         adjustment = base_weight * (value / 100.0)
     else:
+        # Absolute value (lbs or no unit means lbs)
         adjustment = value
 
     if operator == '+':
         return base_weight + adjustment
-    else:
+    else:  # operator == '-'
         return base_weight - adjustment
 
 
