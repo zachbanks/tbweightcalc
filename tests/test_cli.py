@@ -63,10 +63,7 @@ def make_args(
     title: str | None = "Test Program",
     pdf: str | None = None,
 ) -> argparse.Namespace:
-    """
-    Helper to create an argparse-like Namespace for build_program_markdown.
-    Uses the legacy fields that build_program_markdown still understands.
-    """
+    """Helper to create an argparse Namespace for main() / CLI tests."""
     ns = argparse.Namespace()
     ns.week = week
     ns.squat = squat
@@ -77,6 +74,26 @@ def make_args(
     ns.title = title
     ns.pdf = pdf
     return ns
+
+
+def make_lifts(
+    squat: int | None = 455,
+    bench: int | None = 250,
+    deadlift: int | None = 300,
+    weighted_pullup: tuple[int, int] | None = (252, 210),
+) -> list[dict]:
+    """Helper to build a lifts list for build_program_markdown tests."""
+    lifts = []
+    if squat is not None:
+        lifts.append({"exercise": "squat", "one_rm": squat, "body_weight": None, "bar_weight": 45.0})
+    if bench is not None:
+        lifts.append({"exercise": "bench press", "one_rm": bench, "body_weight": None, "bar_weight": 45.0})
+    if deadlift is not None:
+        lifts.append({"exercise": "deadlift", "one_rm": deadlift, "body_weight": None, "bar_weight": 45.0})
+    if weighted_pullup is not None:
+        one_rm, bw = weighted_pullup
+        lifts.append({"exercise": "weighted pullup", "one_rm": one_rm, "body_weight": bw, "bar_weight": 45.0})
+    return lifts
 
 
 # -------------------------------------------------------------------
@@ -106,23 +123,18 @@ def test_default_pdf_path_adds_pdf_extension(monkeypatch, tmp_path):
 
 
 def test_build_program_markdown_single_week_screen():
-    args = make_args(week="2")  # only week 2
-    md = cli.build_program_markdown(args, for_pdf=False)
+    lifts = make_lifts()
+    md = cli.build_program_markdown(lifts, week="2", for_pdf=False)
 
-    # Should include a WEEK 2 header as an H2
     assert "WEEK 2 - 80%" in md
-    # Should not contain PDF-only pagebreak markers
     assert "\\pagebreak" not in md
 
 
 def test_build_program_markdown_pdf_uses_pagebreaks():
-    # This uses "all" weeks so there will be separators
-    args = make_args(week="all")
-    md = cli.build_program_markdown(args, for_pdf=True)
+    lifts = make_lifts()
+    md = cli.build_program_markdown(lifts, week="all", for_pdf=True)
 
-    # In PDF mode we expect raw \pagebreak between weeks
     assert "\\pagebreak" in md
-    # We don't expect visible '---' HRs from our HR helper in PDF mode
     assert "---" not in md
 
 
@@ -675,19 +687,25 @@ def no_side_effects(monkeypatch, tmp_path):
     """
     from tbweightcalc.sessions import SessionStore
 
-    captured = {}
+    _args = argparse.Namespace(lifts=[], week="all", title=None)
+    captured = {"args": _args}
 
-    def fake_copy_to_clipboard(_text: str) -> None:
-        return
+    def fake_copy_to_clipboard(text: str) -> None:
+        captured["clipboard"] = text
+        if text.startswith("# "):
+            captured["args"].title = text.split("\n")[0][2:]
 
     def fake_markdown_to_pdf(_md: str, _path: str, title: str | None = None) -> None:
         return
 
     def fake_build_program_markdown(
-        args: argparse.Namespace, for_pdf: bool = False
+        lifts: list, week: str = "all", for_pdf: bool = False, **kwargs
     ) -> str:
-        captured["args"] = args
-        return "# TEST PROGRAM"
+        captured["args"].lifts = lifts
+        captured["args"].week = week
+        captured["lifts"] = lifts
+        captured["week"] = week
+        return "# TEST PROGRAM\n"
 
     # Use a fresh, empty session store backed by a temp file
     empty_store = SessionStore(path=tmp_path / "sessions.json")

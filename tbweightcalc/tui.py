@@ -1,7 +1,6 @@
 """Textual TUI for Tactical Barbell Max Strength Calculator."""
 from __future__ import annotations
 
-import argparse
 import datetime
 from dataclasses import dataclass, field
 from typing import Optional
@@ -29,7 +28,7 @@ from textual.widgets import (
 )
 
 from tbweightcalc.sessions import SessionStore
-from tbweightcalc.cli import (
+from tbweightcalc.core import (
     _apply_lift_adjustment,
     _ADJUSTMENT_PRESETS,
     build_program_markdown,
@@ -1188,16 +1187,8 @@ class OutputScreen(Screen):
 
     def on_mount(self) -> None:
         state = self.app.state
-        args = argparse.Namespace(
-            week=state.week,
-            lifts=state.lifts,
-            onerm=None,
-            title=state.title,
-            pdf=None,
-        )
-        body = build_program_markdown(args, for_pdf=False)
+        body = build_program_markdown(state.lifts, week=state.week, for_pdf=False)
         self._program_text = f"# {state.title}\n\n{body}"
-        self._args = args
 
         ta = self.query_one("#output-area", TextArea)
         ta.load_text(self._program_text)
@@ -1216,7 +1207,7 @@ class OutputScreen(Screen):
     def _save_pdf(self) -> None:
         state = self.app.state
         try:
-            pdf_body = build_program_markdown(self._args, for_pdf=True)
+            pdf_body = build_program_markdown(state.lifts, week=state.week, for_pdf=True)
             pdf_path = default_pdf_path(state.title)
             pdf_path.parent.mkdir(parents=True, exist_ok=True)
             markdown_to_pdf(pdf_body, str(pdf_path), title=state.title)
