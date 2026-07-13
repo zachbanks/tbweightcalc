@@ -8,6 +8,7 @@ from typing import Optional
 
 from textual import on
 from textual.app import App, ComposeResult
+from textual.events import Key
 from textual.binding import Binding
 from textual.containers import Container, Horizontal, Vertical, ScrollableContainer
 from textual.screen import Screen, ModalScreen
@@ -74,6 +75,7 @@ Screen {
     border: round $accent;
     padding: 1 2;
     margin: 0 1 1 1;
+    height: auto;
 }
 
 .btn-row {
@@ -106,11 +108,11 @@ Screen {
 }
 
 .bar-input {
-    width: 8;
+    width: 12;
 }
 
 .label-input {
-    width: 14;
+    width: 28;
 }
 
 #session-list {
@@ -137,6 +139,7 @@ Screen {
 
 RadioSet {
     margin: 0 1;
+    height: auto;
 }
 
 .slot-label {
@@ -178,9 +181,10 @@ class HomeScreen(Screen):
     BINDINGS = [
         Binding("n", "new_program", "New"),
         Binding("l", "load_selected", "Load"),
-        Binding("enter", "load_selected", "Open", show=False),
+        Binding("enter", "load_selected", "Open", show=False, priority=True),
         Binding("delete", "delete_selected", "Delete", show=False),
         Binding("d", "delete_selected", "Delete"),
+        Binding("p", "view_progression", "Progress"),
     ]
 
     def compose(self) -> ComposeResult:
@@ -194,6 +198,7 @@ class HomeScreen(Screen):
             yield Button("New [n]", id="btn-new", variant="primary")
             yield Button("Load [l]", id="btn-load", variant="default")
             yield Button("Delete [d]", id="btn-delete", variant="error")
+            yield Button("Progress [p]", id="btn-progress", variant="default")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -202,6 +207,18 @@ class HomeScreen(Screen):
     def on_show(self) -> None:
         """Refresh session list every time this screen becomes active."""
         self._refresh_list()
+
+    def on_key(self, event: Key) -> None:
+        if event.character and event.character.isdigit() and event.character != "0":
+            idx = int(event.character) - 1
+            sessions = self.app.state.store.list_sessions()
+            if idx < len(sessions):
+                session = sessions[idx]
+                state = self.app.state
+                state.lifts = [dict(l) for l in session["lifts"]]
+                state.loaded_session_name = session["name"]
+                event.stop()
+                self.app.push_screen(ActionScreen())
 
     def _refresh_list(self) -> None:
         lv = self.query_one("#session-list", ListView)
@@ -222,6 +239,10 @@ class HomeScreen(Screen):
         if not sessions:
             return None
         return lv.index  # 0-based
+
+    @on(ListView.Selected)
+    def list_item_selected(self, event: ListView.Selected) -> None:
+        self.action_load_selected()
 
     @on(Button.Pressed, "#btn-new")
     def action_new_program(self) -> None:
@@ -245,6 +266,10 @@ class HomeScreen(Screen):
         state.loaded_session_name = session["name"]
         self.app.push_screen(ActionScreen())
 
+    @on(Button.Pressed, "#btn-progress")
+    def action_view_progression(self) -> None:
+        self.app.push_screen(ProgressionScreen())
+
     @on(Button.Pressed, "#btn-delete")
     def action_delete_selected(self) -> None:
         idx = self._selected_index()
@@ -261,8 +286,11 @@ class HomeScreen(Screen):
 class ActionScreen(Screen):
     """Choose what to do with a loaded session: output / edit / duplicate."""
 
+    _selected_action: str = "r-output"
+
     BINDINGS = [
-        Binding("escape", "app.pop_screen", "Back"),
+        Binding("escape", "app.back", "Back", priority=True),
+        Binding("q", "app.pop_screen", "Back", show=False),
         Binding("o", "quick_output", "Output"),
         Binding("e", "quick_edit", "Edit"),
         Binding("d", "quick_duplicate", "Duplicate"),
@@ -285,6 +313,12 @@ class ActionScreen(Screen):
             yield Button("Continue [↵]", id="btn-continue", variant="primary")
         yield Footer()
 
+    @on(RadioSet.Changed, "#action-radio")
+    def on_radio_changed(self, event: RadioSet.Changed) -> None:
+        buttons = list(self.query_one("#action-radio", RadioSet).query(RadioButton))
+        if 0 <= event.index < len(buttons):
+            self._selected_action = buttons[event.index].id or "r-output"
+
     @on(Button.Pressed, "#btn-back")
     def go_back(self) -> None:
         self.app.pop_screen()
@@ -302,10 +336,7 @@ class ActionScreen(Screen):
         self._do_continue("r-duplicate")
 
     def action_go_continue(self) -> None:
-        rs = self.query_one("#action-radio", RadioSet)
-        pressed = rs.pressed_button
-        bid = pressed.id if pressed else "r-output"
-        self._do_continue(bid)
+        self._do_continue(self._selected_action)
 
     @on(Button.Pressed, "#btn-continue")
     def go_continue(self) -> None:
@@ -320,8 +351,9 @@ class ActionScreen(Screen):
             self.app.push_screen(GenerateScreen())
         elif bid == "r-edit":
             state.mode = "edit"
+            state.title = state.loaded_session_name or ""
             state.skip_save = False
-            self.app.push_screen(SetupScreen(title_only=True))
+            self.app.push_screen(EditLiftsScreen())
         else:
             state.mode = "duplicate"
             state.skip_save = False
@@ -332,7 +364,8 @@ class SetupScreen(Screen):
     """Enter program title and choose template."""
 
     BINDINGS = [
-        Binding("escape", "app.pop_screen", "Back"),
+        Binding("escape", "app.back", "Back", priority=True),
+        Binding("q", "app.pop_screen", "Back", show=False),
         Binding("ctrl+enter", "go_next", "Next"),
     ]
 
@@ -410,7 +443,8 @@ class LiftEntryScreen(Screen):
     """Enter 1RM for each lift in the chosen preset template."""
 
     BINDINGS = [
-        Binding("escape", "app.pop_screen", "Back"),
+        Binding("escape", "app.back", "Back", priority=True),
+        Binding("q", "app.pop_screen", "Back", show=False),
         Binding("ctrl+enter", "go_next", "Next"),
     ]
 
@@ -524,7 +558,8 @@ class CustomLiftScreen(Screen):
     """Template 4: slot-based custom exercise selection."""
 
     BINDINGS = [
-        Binding("escape", "app.pop_screen", "Back"),
+        Binding("escape", "app.back", "Back", priority=True),
+        Binding("q", "app.pop_screen", "Back", show=False),
         Binding("ctrl+enter", "go_next", "Next"),
     ]
 
@@ -640,11 +675,189 @@ class CustomLiftScreen(Screen):
         self.app.push_screen(ReviewScreen())
 
 
+class EditLiftsScreen(Screen):
+    """Edit all lifts for an existing session — shows pre-filled inputs for every lift."""
+
+    BINDINGS = [
+        Binding("escape", "app.back", "Back", priority=True),
+        Binding("q", "app.pop_screen", "Back", show=False),
+        Binding("ctrl+enter", "go_next", "Continue"),
+    ]
+
+    def on_mount(self) -> None:
+        try:
+            self.query("#orm_0,#bw_0")[0].focus()
+        except Exception:
+            pass
+
+    def compose(self) -> ComposeResult:
+        state = self.app.state
+        yield Header(show_clock=False)
+        yield Static(f"Edit: {state.title}", classes="screen-title")
+        yield Rule()
+        yield Static("Edit values  •  Tab to move  •  Enter accepts: plain lbs, '240 5' (set→1RM), '+5%' or '-3%'  •  [ctrl+↵] to continue", classes="section-label")
+
+        with ScrollableContainer():
+            for i, lift in enumerate(state.lifts):
+                ex = lift["exercise"]
+                is_wpu = lift.get("body_weight") is not None
+                yield Static(format_exercise_name(ex), classes="slot-label")
+                if is_wpu:
+                    bw = lift.get("body_weight", "")
+                    added = lift["one_rm"] - (lift.get("body_weight") or 0)
+                    with Horizontal(classes="lift-row"):
+                        yield Label("Bodyweight (lb):", classes="lift-label")
+                        yield Input(value=str(bw), id=f"bw_{i}", classes="lift-input")
+                        yield Label("Added weight (lb):", classes="lift-label")
+                        yield Input(value=str(added), id=f"added_{i}", placeholder="lbs or +5%", classes="lift-input")
+                else:
+                    with Horizontal(classes="lift-row"):
+                        yield Label("1RM (lb):", classes="lift-label")
+                        yield Input(value=str(lift["one_rm"]), id=f"orm_{i}", placeholder="lbs, +5%, or 240 5", classes="lift-input")
+                        yield Label("Bar (lb):", classes="lift-label")
+                        yield Input(value=str(int(lift.get("bar_weight", 45))), id=f"bar_{i}", classes="bar-input")
+                        yield Label("Bar label:", classes="lift-label")
+                        yield Input(value=lift.get("bar_label") or "", id=f"lbl_{i}", placeholder="e.g. SSB", classes="label-input")
+
+            yield Rule()
+            yield Static("Quick % adjustment  (updates 1RM fields above)", classes="slot-label")
+            with Horizontal(classes="lift-row"):
+                yield Label("Adjust all 1RMs by:", classes="lift-label")
+                yield Input(id="pct-adjust", placeholder="e.g. +5 or -3", classes="lift-input")
+                yield Button("Apply", id="btn-apply-pct", variant="default")
+
+        with Horizontal(classes="btn-row"):
+            yield Button("Back", id="btn-back", variant="default")
+            yield Button("Continue [ctrl+↵]", id="btn-next", variant="primary")
+        yield Footer()
+
+    def _val(self, wid: str) -> str:
+        try:
+            return self.query_one(f"#{wid}", Input).value.strip()
+        except Exception:
+            return ""
+
+    def _resolve_input(self, val: str, base: int) -> int | None:
+        """
+        Interprets special input syntax; returns resolved integer or None (plain number, leave as-is).
+          '+5%' or '-3%' → percentage of base
+          '240 5'        → estimated 1RM from set
+        """
+        v = val.strip()
+        if v.endswith("%"):
+            try:
+                pct = float(v.lstrip("+").rstrip("%"))
+                return round(base * (1 + pct / 100))
+            except ValueError:
+                self.notify("Invalid percentage.", severity="error")
+                return None
+        if len(v.split()) == 2:
+            result = parse_one_rm_string(v)
+            if result is not None:
+                return result
+        return None
+
+    @on(Input.Submitted)
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        inp = event.input
+        val = inp.value.strip()
+        field_id = inp.id or ""
+
+        if field_id.startswith("orm_"):
+            try:
+                idx = int(field_id.split("_")[1])
+            except (ValueError, IndexError):
+                return
+            base = self.app.state.lifts[idx]["one_rm"]
+            new_val = self._resolve_input(val, base)
+            if new_val is not None:
+                inp.value = str(new_val)
+
+        elif field_id.startswith("added_"):
+            try:
+                idx = int(field_id.split("_")[1])
+            except (ValueError, IndexError):
+                return
+            lift = self.app.state.lifts[idx]
+            base = lift["one_rm"] - (lift.get("body_weight") or 0)
+            new_val = self._resolve_input(val, base)
+            if new_val is not None:
+                inp.value = str(new_val)
+
+    @on(Button.Pressed, "#btn-apply-pct")
+    def apply_pct(self) -> None:
+        raw = self._val("pct-adjust").lstrip("+").rstrip("%")
+        try:
+            pct = float(raw)
+        except ValueError:
+            self.notify("Enter a number, e.g. +5 or -3.", severity="error")
+            return
+        multiplier = 1 + pct / 100
+        for i, lift in enumerate(self.app.state.lifts):
+            if lift.get("body_weight") is not None:
+                try:
+                    inp = self.query_one(f"#added_{i}", Input)
+                    inp.value = str(round(int(inp.value.strip() or "0") * multiplier))
+                except Exception:
+                    pass
+            else:
+                try:
+                    inp = self.query_one(f"#orm_{i}", Input)
+                    inp.value = str(round(int(inp.value.strip() or "0") * multiplier))
+                except Exception:
+                    pass
+        sign = "+" if pct >= 0 else ""
+        self.notify(f"Applied {sign}{pct:g}% to all 1RMs.")
+
+    @on(Button.Pressed, "#btn-back")
+    def go_back(self) -> None:
+        self.app.pop_screen()
+
+    @on(Button.Pressed, "#btn-next")
+    def action_go_next(self) -> None:
+        state = self.app.state
+        new_lifts = []
+        for i, lift in enumerate(state.lifts):
+            lift = dict(lift)
+            is_wpu = lift.get("body_weight") is not None
+            if is_wpu:
+                try:
+                    bw = int(self._val(f"bw_{i}"))
+                    added = int(self._val(f"added_{i}"))
+                    lift["body_weight"] = bw
+                    lift["one_rm"] = bw + added
+                except ValueError:
+                    self.notify(f"Invalid values for {format_exercise_name(lift['exercise'])}.", severity="error")
+                    return
+            else:
+                orm_raw = self._val(f"orm_{i}")
+                one_rm = parse_one_rm_string(orm_raw)
+                if one_rm is None:
+                    self.notify(f"Invalid 1RM for {format_exercise_name(lift['exercise'])}: '{orm_raw}'", severity="error")
+                    return
+                try:
+                    bar_weight = float(self._val(f"bar_{i}") or "45")
+                except ValueError:
+                    bar_weight = 45.0
+                lift["one_rm"] = one_rm
+                lift["bar_weight"] = bar_weight
+                lift["bar_label"] = self._val(f"lbl_{i}") or None
+            new_lifts.append(lift)
+
+        state.lifts = new_lifts
+        # auto-save the edited session back to the same name
+        state.store.save_session(state.title, state.lifts)
+        self.notify(f"Saved '{state.title}'.")
+        state.skip_save = True
+        self.app.push_screen(GenerateScreen())
+
+
 class AdjustmentScreen(Screen):
     """Choose a % adjustment for duplicate mode (applied before review)."""
 
     BINDINGS = [
-        Binding("escape", "app.pop_screen", "Back"),
+        Binding("escape", "app.back", "Back", priority=True),
+        Binding("q", "app.pop_screen", "Back", show=False),
         Binding("ctrl+enter", "go_next", "Next"),
     ]
 
@@ -656,21 +869,22 @@ class AdjustmentScreen(Screen):
 
         exercise_names = [l["exercise"] for l in state.lifts]
 
-        yield Static("Preset adjustment (applied to all 1RMs):", classes="section-label")
-        with Container(classes="card"):
-            with RadioSet(id="preset-radio"):
-                yield RadioButton("Skip — no adjustment", id="p-skip", value=True)
-                for i, (label, _) in enumerate(_ADJUSTMENT_PRESETS):
-                    yield RadioButton(label, id=f"p-{i}")
-                yield RadioButton("Custom %", id="p-custom")
-            yield Input(id="custom-pct", placeholder="e.g. 7.5 or -3", classes="lift-input")
+        with ScrollableContainer():
+            yield Static("Preset adjustment (applied to all 1RMs):", classes="section-label")
+            with Container(classes="card"):
+                with RadioSet(id="preset-radio"):
+                    yield RadioButton("Skip — no adjustment", id="p-skip", value=True)
+                    for i, (label, _) in enumerate(_ADJUSTMENT_PRESETS):
+                        yield RadioButton(label, id=f"p-{i}")
+                    yield RadioButton("Custom %", id="p-custom")
+                yield Input(id="custom-pct", placeholder="e.g. 7.5 or -3", classes="lift-input")
 
-        yield Static("Apply to:", classes="section-label")
-        with Container(classes="card"):
-            with RadioSet(id="scope-radio"):
-                yield RadioButton("All lifts", id="scope-all", value=True)
-                for ex in exercise_names:
-                    yield RadioButton(format_exercise_name(ex), id=f"scope-{ex.replace(' ','_')}")
+            yield Static("Apply to:", classes="section-label")
+            with Container(classes="card"):
+                with RadioSet(id="scope-radio"):
+                    yield RadioButton("All lifts", id="scope-all", value=True)
+                    for ex in exercise_names:
+                        yield RadioButton(format_exercise_name(ex), id=f"scope-{ex.replace(' ','_')}")
 
         with Horizontal(classes="btn-row"):
             yield Button("Back", id="btn-back", variant="default")
@@ -727,7 +941,7 @@ class AdjustmentScreen(Screen):
 class EditLiftModal(ModalScreen):
     """Modal to edit a single lift's 1RM in the review screen."""
 
-    BINDINGS = [Binding("escape", "dismiss_modal", "Cancel", show=False)]
+    BINDINGS = [Binding("escape", "dismiss_modal", "Cancel", show=False, priority=True)]
 
     def action_dismiss_modal(self) -> None:
         self.dismiss(False)
@@ -810,7 +1024,8 @@ class ReviewScreen(Screen):
     """Review all entered lifts; click a row to edit."""
 
     BINDINGS = [
-        Binding("escape", "app.pop_screen", "Back"),
+        Binding("escape", "app.back", "Back", priority=True),
+        Binding("q", "app.pop_screen", "Back", show=False),
         Binding("e", "edit_selected", "Edit row"),
         Binding("ctrl+enter", "go_continue", "Continue"),
     ]
@@ -819,7 +1034,7 @@ class ReviewScreen(Screen):
         yield Header(show_clock=False)
         yield Static("Review Lifts", classes="screen-title")
         yield Rule()
-        yield Static("Select row + [e] to edit  •  [ctrl+↵] to continue.", classes="section-label")
+        yield Static("Arrow keys to navigate  •  Enter to edit lift  •  [ctrl+↵] to continue", classes="section-label")
         yield DataTable(id="lift-table", cursor_type="row")
         with Horizontal(classes="btn-row"):
             yield Button("Back", id="btn-back", variant="default")
@@ -829,6 +1044,7 @@ class ReviewScreen(Screen):
 
     def on_mount(self) -> None:
         self._build_table()
+        self.query_one("#lift-table", DataTable).focus()
 
     def _build_table(self) -> None:
         table = self.query_one("#lift-table", DataTable)
@@ -869,6 +1085,12 @@ class ReviewScreen(Screen):
 
     @on(Button.Pressed, "#btn-continue")
     def action_go_continue(self) -> None:
+        state = self.app.state
+        if state.mode == "duplicate":
+            state.store.save_session(state.title, state.lifts)
+            self.notify(f"Saved '{state.title}'.")
+            state.loaded_session_name = state.title
+            state.skip_save = True
         self.app.push_screen(GenerateScreen())
 
 
@@ -876,29 +1098,34 @@ class GenerateScreen(Screen):
     """Choose week and output mode, then generate."""
 
     BINDINGS = [
-        Binding("escape", "app.pop_screen", "Back"),
-        Binding("enter", "generate", "Generate", show=False),
+        Binding("escape", "app.back", "Back", priority=True),
+        Binding("q", "app.pop_screen", "Back", show=False),
+        Binding("enter", "generate", "Generate", show=False, priority=True),
         Binding("g", "generate", "Generate"),
     ]
+
+    def on_mount(self) -> None:
+        self.query_one("#week-radio", RadioSet).focus()
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
         yield Static("Generate Program", classes="screen-title")
         yield Rule()
 
-        yield Static("Week", classes="section-label")
-        with Container(classes="card"):
-            with RadioSet(id="week-radio"):
-                yield RadioButton("All weeks", id="w-all", value=True)
-                for i in range(1, 7):
-                    yield RadioButton(f"Week {i}", id=f"w-{i}")
+        with ScrollableContainer():
+            yield Static("Week", classes="section-label")
+            with Container(classes="card"):
+                with RadioSet(id="week-radio"):
+                    yield RadioButton("All weeks", id="w-all", value=True)
+                    for i in range(1, 7):
+                        yield RadioButton(f"Week {i}", id=f"w-{i}")
 
-        yield Static("Output format", classes="section-label")
-        with Container(classes="card"):
-            with RadioSet(id="mode-radio"):
-                yield RadioButton("Text (clipboard)", id="m-t")
-                yield RadioButton("PDF", id="m-p")
-                yield RadioButton("Both", id="m-b", value=True)
+            yield Static("Output format", classes="section-label")
+            with Container(classes="card"):
+                with RadioSet(id="mode-radio"):
+                    yield RadioButton("Text (clipboard)", id="m-t")
+                    yield RadioButton("PDF", id="m-p")
+                    yield RadioButton("Both", id="m-b", value=True)
 
         with Horizontal(classes="btn-row"):
             state = self.app.state
@@ -935,7 +1162,9 @@ class OutputScreen(Screen):
         Binding("c", "copy", "Copy", priority=True),
         Binding("p", "save_pdf", "PDF", priority=True),
         Binding("s", "save_session", "Save", priority=True),
-        Binding("escape", "go_done", "Done"),
+        Binding("j", "scroll_down_output", "↓", show=False, priority=True),
+        Binding("k", "scroll_up_output", "↑", show=False, priority=True),
+        Binding("escape", "go_done", "Done", priority=True),
         Binding("q", "go_done", "Done", show=False),
     ]
 
@@ -972,8 +1201,8 @@ class OutputScreen(Screen):
 
         ta = self.query_one("#output-area", TextArea)
         ta.load_text(self._program_text)
+        ta.focus()
 
-        # Run clipboard/PDF after the screen has rendered so we don't block the UI
         self.call_after_refresh(self._auto_output)
 
     def _auto_output(self) -> None:
@@ -994,6 +1223,12 @@ class OutputScreen(Screen):
             self.notify(f"PDF saved: {pdf_path.name}")
         except Exception as e:
             self.notify(f"PDF failed: {e}", severity="error")
+
+    def action_scroll_down_output(self) -> None:
+        self.query_one("#output-area", TextArea).scroll_down()
+
+    def action_scroll_up_output(self) -> None:
+        self.query_one("#output-area", TextArea).scroll_up()
 
     @on(Button.Pressed, "#btn-copy")
     def action_copy(self) -> None:
@@ -1017,7 +1252,7 @@ class OutputScreen(Screen):
 class SaveSessionModal(ModalScreen):
     """Modal prompt to name and save the current session."""
 
-    BINDINGS = [Binding("escape", "dismiss_modal", "Cancel", show=False)]
+    BINDINGS = [Binding("escape", "dismiss_modal", "Cancel", show=False, priority=True)]
 
     def action_dismiss_modal(self) -> None:
         self.dismiss(None)
@@ -1050,6 +1285,84 @@ class SaveSessionModal(ModalScreen):
 
 
 # ---------------------------------------------------------------------------
+# Progression View
+# ---------------------------------------------------------------------------
+
+class ProgressionScreen(Screen):
+    """View 1RM progression by exercise across all saved sessions."""
+
+    BINDINGS = [
+        Binding("escape", "app.back", "Back", priority=True),
+        Binding("q", "app.back", "Back", show=False),
+    ]
+
+    def _sessions_chrono(self) -> list[dict]:
+        return sorted(
+            self.app.state.store.list_sessions(),
+            key=lambda s: s.get("updated") or s["created"],
+        )
+
+    def _unique_exercises(self) -> list[str]:
+        seen: set[str] = set()
+        exercises: list[str] = []
+        for s in self._sessions_chrono():
+            for lift in s.get("lifts", []):
+                ex = lift["exercise"]
+                if ex not in seen:
+                    seen.add(ex)
+                    exercises.append(ex)
+        return exercises
+
+    def compose(self) -> ComposeResult:
+        exercises = self._unique_exercises()
+        yield Header(show_clock=False)
+        yield Static("1RM Progression", classes="screen-title")
+        yield Rule()
+        if not exercises:
+            yield Static("No saved sessions found.", classes="section-label")
+        else:
+            yield Static("Select exercise:", classes="section-label")
+            with Container(classes="card"):
+                with RadioSet(id="ex-radio"):
+                    for i, ex in enumerate(exercises):
+                        yield RadioButton(format_exercise_name(ex), id=f"ex-{i}", value=(i == 0))
+            yield Static("Progression  (oldest → newest):", classes="section-label")
+            yield DataTable(id="prog-table")
+        with Horizontal(classes="btn-row"):
+            yield Button("Back [esc]", id="btn-back", variant="default")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        exercises = self._unique_exercises()
+        if exercises:
+            self._build_table(0)
+            self.query_one("#ex-radio", RadioSet).focus()
+
+    def _build_table(self, ex_idx: int) -> None:
+        exercises = self._unique_exercises()
+        if ex_idx >= len(exercises):
+            return
+        exercise = exercises[ex_idx]
+        table = self.query_one("#prog-table", DataTable)
+        table.clear(columns=True)
+        table.add_columns("Date", "Session", "1RM")
+        for s in self._sessions_chrono():
+            date = s.get("updated") or s["created"]
+            for lift in s.get("lifts", []):
+                if lift["exercise"] == exercise:
+                    table.add_row(date, s["name"], f"{lift['one_rm']}#")
+                    break
+
+    @on(RadioSet.Changed, "#ex-radio")
+    def on_ex_changed(self, event: RadioSet.Changed) -> None:
+        self._build_table(event.index)
+
+    @on(Button.Pressed, "#btn-back")
+    def go_back(self) -> None:
+        self.app.pop_screen()
+
+
+# ---------------------------------------------------------------------------
 # Main App
 # ---------------------------------------------------------------------------
 
@@ -1058,8 +1371,10 @@ class TBCalcApp(App):
 
     CSS = CSS
     TITLE = "Tactical Barbell"
-    # q quits from any screen that doesn't consume it (i.e. not inside an Input/TextArea)
-    BINDINGS = [Binding("q", "quit", "Quit")]
+    BINDINGS = [
+        Binding("q", "quit", "Quit"),
+        Binding("Q", "quit", "Quit App", priority=True),
+    ]
 
     def __init__(self):
         super().__init__()
@@ -1069,18 +1384,16 @@ class TBCalcApp(App):
         self.push_screen(HomeScreen())
 
     def pop_screen_all(self) -> None:
-        """Pop all screens above HomeScreen using Textual's built-in _pop_to_screen."""
+        """Pop screens one-at-a-time until HomeScreen is active."""
         home = next((s for s in self.screen_stack if isinstance(s, HomeScreen)), None)
         if home is None:
-            # No HomeScreen found — push a fresh one
             self.push_screen(HomeScreen())
             return
-        if self.screen_stack[-1] is home:
+        if len(self.screen_stack) <= 1 or self.screen_stack[-1] is home:
             home._refresh_list()
             return
-        # _pop_to_screen pops asynchronously via call_later + batch_update;
-        # on_show on HomeScreen will refresh the list when it becomes active.
-        self._pop_to_screen(home)
+        self.pop_screen()
+        self.call_after_refresh(self.pop_screen_all)
 
 
 def run_tui() -> None:
