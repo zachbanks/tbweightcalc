@@ -107,20 +107,26 @@ class Program:
         else:
             raise ValueError("Week must be 1–6 or 'all'")
 
-        # Header with optional bar weight/label for custom bars
-        if bar_weight != 45.0:
-            # Format the bar weight
-            if hasattr(fmt, 'format_weight'):
-                bar_display = fmt.format_weight(bar_weight)
-            else:
-                # Fallback for formatters without format_weight
-                bar_display = f"{int(bar_weight) if bar_weight == int(bar_weight) else bar_weight} lbs"
+        # Header with optional bar label / custom bar weight
+        if hasattr(fmt, 'format_weight'):
+            bar_display = fmt.format_weight(bar_weight)
+        else:
+            w = bar_weight
+            bar_display = f"{int(w) if w == int(w) else w}#"
 
-            # Add label if provided
-            if bar_label:
-                output_lines.append(fmt.heading(f"{exercise.upper()} ({bar_label} - {bar_display})", level=3))
-            else:
-                output_lines.append(fmt.heading(f"{exercise.upper()} ({bar_display} Bar)", level=3))
+        if bar_label and bar_weight != 45.0:
+            # e.g. "ZERCHER SQUAT (Axle Bar - 25#)"
+            output_lines.append(fmt.heading(f"{exercise.upper()} ({bar_label} - {bar_display})", level=3))
+        elif bar_label:
+            # label provided but standard bar weight — still show it
+            output_lines.append(fmt.heading(f"{exercise.upper()} ({bar_label})", level=3))
+        elif bar_weight != 45.0:
+            bar_indicator = (
+                fmt.formatting_config.bar_indicator
+                if (fmt.formatting_config and hasattr(fmt.formatting_config, 'bar_indicator'))
+                else "bar"
+            )
+            output_lines.append(fmt.heading(f"{exercise.upper()} ({bar_display} {bar_indicator})", level=3))
         else:
             output_lines.append(fmt.heading(f"{exercise.upper()}", level=3))
         output_lines.append("")  # blank line

@@ -1,4 +1,4 @@
-from .exercise_set import ExerciseSet, optimize_warmup_weight, ensure_linear_warmup_progression
+from .exercise_set import ExerciseSet, optimize_warmup_weight
 from .formatting import Formatter, PlainFormatter
 
 # ---------------------------------------------------------------------------
@@ -339,65 +339,32 @@ class ExerciseCluster:
             elif kind == "wpu":
                 s.bar = False
                 s.calc_weighted_pullup(
-                    self.working_weight,
+                    self.oneRepMax,
                     self.body_weight,
-                    d["multiplier"],
+                    d["multiplier"] * self.week_multiplier,
                 )
-                # Plate breakdown only when total weight > 45#
-                s.plate_breakdown_on = s.weight > 45
+                # Plate breakdown whenever added weight > 0
+                s.plate_breakdown_on = s.weight > 0
 
             built_sets.append(s)
 
         # Second pass: apply warmup optimization with lookahead
         if profile["kind"] == "barbell":
-            # First, apply individual warmup optimizations (reduce plate clutter)
-            # NOTE: We skip this optimization pass because it can create non-linearities
-            # that conflict with the second pass. The second pass (ensure_linear_warmup_progression)
-            # now handles all warmup optimization including linear progression.
-            # for idx, (d, s) in enumerate(zip(setdefs, built_sets)):
-            #     if d.get("multiplier", 1.0) < 1.0:
-            #         next_weight = None
-            #         for next_set in built_sets[idx + 1 :]:
-            #             next_weight = next_set.weight
-            #             break
-            #
-            #         s.weight = optimize_warmup_weight(
-            #             total_weight=s.weight,
-            #             bar_weight=self.bar_weight,
-            #             threshold=2.5,
-            #             next_total_weight=next_weight,
-            #         )
-
-            # Second, ensure linear progression (work backwards to fix any issues)
-            warmup_weights = []
-            warmup_indices = []
-            working_weight = None
-
+            # First, apply individual warmup optimizations (reduce plate clutter + preload big plates)
             for idx, (d, s) in enumerate(zip(setdefs, built_sets)):
                 if d.get("multiplier", 1.0) < 1.0:
-                    warmup_weights.append(s.weight)
-                    warmup_indices.append(idx)
-                else:
-                    # This is the working set
-                    working_weight = s.weight
-                    break  # Only care about first working set for warmup progression
+                    next_weight = None
+                    for next_set in built_sets[idx + 1 :]:
+                        next_weight = next_set.weight
+                        break
 
-            if warmup_weights and working_weight:
-                # Allow up to 25% increase per warmup to ensure linear progression
-                # For heavy lifts, this might mean significant jumps
-                max_pct_increase = 0.25
-                max_increase = max(30.0, working_weight * max_pct_increase)
+                    s.weight = optimize_warmup_weight(
+                        total_weight=s.weight,
+                        bar_weight=self.bar_weight,
+                        threshold=2.5,
+                        next_total_weight=next_weight,
+                    )
 
-                adjusted_warmups = ensure_linear_warmup_progression(
-                    warmup_weights,
-                    working_weight,
-                    bar_weight=self.bar_weight,
-                    max_increase_per_warmup=max_increase,
-                )
-
-                # Apply the adjusted weights back to the sets
-                for idx, adjusted_weight in zip(warmup_indices, adjusted_warmups):
-                    built_sets[idx].weight = adjusted_weight
-
+    
         # Save sets
         self.sets = built_sets

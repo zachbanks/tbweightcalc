@@ -52,33 +52,31 @@ class TestExerciseCluster(unittest.TestCase):
             "Expected a (1-3) x 3 set with 360 in deadlift cluster output.",
         )
 
-        # ----- Weighted pull-ups: week 1, low load -> bodyweight only -----
+        # ----- Weighted pull-ups: week 1 -> 1rm*0.70 - bw may be negative -> Bodyweight -----
+        # 297 * 0.70 - 212 = 207.9 - 212 = -4.1 -> Bodyweight
         c = ExerciseCluster(
-            week=1, exercise=ExerciseCluster.WPU, oneRepMax=240, body_weight=180
+            week=1, exercise=ExerciseCluster.WPU, oneRepMax=297, body_weight=212
         )
         out = str(c).strip()
-
-        # For low loads we expect just bodyweight text, no plate breakdown
         self.assertIn("Bodyweight", out)
 
-        # ----- Weighted pull-ups: week 3, heavier load -> show added weight -----
+        # ----- Weighted pull-ups: week 3 -> 1rm*0.90 - bw -----
+        # 297 * 0.90 - 212 = 267.3 - 212 = 55.3 -> round to 55# = "45 10"
         c = ExerciseCluster(
-            week=3, exercise=ExerciseCluster.WPU, oneRepMax=240, body_weight=180
+            week=3, exercise=ExerciseCluster.WPU, oneRepMax=297, body_weight=212
         )
         out = str(c).strip()
-        # Should show the added weight (here 35) in some form
-        self.assertIn("35", out)
+        self.assertIn("55", out)
+        self.assertIn("45 10", out)
 
-        # ----- Weighted pull-ups: week 6, heavier again -> show plates, not bar -----
+        # ----- Weighted pull-ups: week 6 -> 1rm*0.95 - bw -----
+        # 297 * 0.95 - 212 = 282.15 - 212 = 70.15 -> round to 70# = "45 25"
         c = ExerciseCluster(
-            week=6, exercise=ExerciseCluster.WPU, oneRepMax=300, body_weight=180
+            week=6, exercise=ExerciseCluster.WPU, oneRepMax=297, body_weight=212
         )
         out = str(c).strip()
-
-        # Should show the added weight (around 105) somewhere
-        self.assertIn("105", out)
-        # Should show some plate breakdown (e.g. (45 x 2)), but not say "Bar"
-        self.assertIn("45", out)
+        self.assertIn("70", out)
+        self.assertIn("45 25", out)
         self.assertNotIn(
             "Bar", out, msg="WPU should not include bar weight in description."
         )

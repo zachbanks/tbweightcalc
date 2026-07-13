@@ -92,17 +92,24 @@ class TestExerciseSet(unittest.TestCase):
         def test_calc_weighted_pullup(self):
             s = ExerciseSet(bar=False)
 
-            # Weight should = working weight * multiplier - bodyweight
+            # Weight = round(1rm * multiplier - bw)
+            # 260 * 1.0 - 200 = 60
             s.calc_weighted_pullup(260, 200, 1.0)
             self.assertEqual(s.weight, 60)
             self.assertEqual(s.plate_breakdown, "45 15")
 
+            # 260 * 0.90 - 200 = 234 - 200 = 34 -> round to 35
             s.calc_weighted_pullup(260, 200, 0.90)
-            self.assertEqual(s.weight, 34)
+            self.assertEqual(s.weight, 35)
             self.assertEqual(s.plate_breakdown, "35")
 
-            # If weight returns negative => 0
+            # 260 * 0.75 - 200 = 195 - 200 = -5 -> Bodyweight
             s.calc_weighted_pullup(260, 200, 0.75)
+            self.assertEqual(s.weight, 0)
+            self.assertEqual(s.plate_breakdown, "Bodyweight")
+
+            # 200 * 1.0 - 200 = 0 -> Bodyweight
+            s.calc_weighted_pullup(200, 200, 1.0)
             self.assertEqual(s.weight, 0)
             self.assertEqual(s.plate_breakdown, "Bodyweight")
 
@@ -175,13 +182,13 @@ class TestExerciseSet(unittest.TestCase):
             self.assertNotIn("(45 x 2)", out)
 
         def test_bar_label_with_bar_only_weight(self):
-            # Test that bar label appears when weight is bar-only (45 lbs)
+            # Bar-only sets show just the label name (no redundant weight)
             s = ExerciseSet(weight=45, bar_weight=45, bar_label="Safety Squat Bar")
-            self.assertEqual(s.plate_breakdown, "Safety Squat Bar - 45 lbs")
+            self.assertEqual(s.plate_breakdown, "Safety Squat Bar")
 
             # Test with different bar weight
             s = ExerciseSet(weight=55, bar_weight=55, bar_label="Trap Bar")
-            self.assertEqual(s.plate_breakdown, "Trap Bar - 55 lbs")
+            self.assertEqual(s.plate_breakdown, "Trap Bar")
 
         def test_bar_label_without_label(self):
             # Test that default "Bar" is shown when no label is provided
