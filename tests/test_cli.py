@@ -237,23 +237,26 @@ def test_main_uses_default_title_when_not_provided(monkeypatch, capsys, tmp_path
     assert pdf_path.exists()
 
 
-def test_main_calls_run_interactive_when_no_args(monkeypatch):
+def test_main_calls_run_tui_when_no_args(monkeypatch):
     """
     When tbcalc is run with no CLI arguments (other than the program name),
-    main() should call run_interactive() instead of parsing flags.
+    main() should launch the TUI instead of parsing flags.
     """
-    called = {"run_interactive": False}
+    from tbweightcalc import tui as _tui_mod
 
-    def fake_run_interactive():
-        called["run_interactive"] = True
+    called = {"run_tui": False}
 
-    # Pretend we invoked "tbcalc" with no extra args
-    monkeypatch.setattr(cli, "run_interactive", fake_run_interactive)
+    def fake_run_tui():
+        called["run_tui"] = True
+
+    # Patch run_tui on the already-imported tui module so the inline
+    # "from tbweightcalc.tui import run_tui" inside main() picks it up.
+    monkeypatch.setattr(_tui_mod, "run_tui", fake_run_tui)
     monkeypatch.setattr(sys, "argv", ["tbcalc"])
 
     cli.main()
 
-    assert called["run_interactive"] is True
+    assert called["run_tui"] is True
 
 
 # -------------------------------------------------------------------
@@ -365,6 +368,54 @@ class TestParseOneRmString:
         # 240.5 x 5 -> Epley: 240.5 * (1 + 5/30) = 240.5 * 7/6 ≈ 280.583 -> 281
         assert cli.parse_one_rm_string("240.5 5") == 281
         assert cli.parse_one_rm_string("240.5x5") == 281
+
+    def test_math_expression_percentage_addition(self):
+        # 240 + 10% -> 240 + 24 = 264
+        assert cli.parse_one_rm_string("240 + 10%") == 264
+        assert cli.parse_one_rm_string("240+10%") == 264
+        assert cli.parse_one_rm_string("240 +10%") == 264
+        assert cli.parse_one_rm_string("240+ 10%") == 264
+
+    def test_math_expression_percentage_subtraction(self):
+        # 240 - 5% -> 240 - 12 = 228
+        assert cli.parse_one_rm_string("240 - 5%") == 228
+        assert cli.parse_one_rm_string("240-5%") == 228
+        assert cli.parse_one_rm_string("240 -5%") == 228
+        assert cli.parse_one_rm_string("240- 5%") == 228
+
+    def test_math_expression_absolute_addition(self):
+        # 240 + 20 -> 260
+        assert cli.parse_one_rm_string("240 + 20") == 260
+        assert cli.parse_one_rm_string("240+20") == 260
+        # With 'lbs' suffix
+        assert cli.parse_one_rm_string("240 + 20 lbs") == 260
+        assert cli.parse_one_rm_string("240+20lbs") == 260
+        assert cli.parse_one_rm_string("240 + 20 lb") == 260
+
+    def test_math_expression_absolute_subtraction(self):
+        # 240 - 10 -> 230
+        assert cli.parse_one_rm_string("240 - 10") == 230
+        assert cli.parse_one_rm_string("240-10") == 230
+        # With 'lbs' suffix
+        assert cli.parse_one_rm_string("240 - 10 lbs") == 230
+        assert cli.parse_one_rm_string("240-10lbs") == 230
+        assert cli.parse_one_rm_string("240 - 10 lb") == 230
+
+    def test_math_expression_with_decimals(self):
+        # 240.5 + 10% -> 240.5 + 24.05 = 264.55 -> 265
+        assert cli.parse_one_rm_string("240.5 + 10%") == 265
+        # 240 + 5.5 -> 245.5 -> 246
+        assert cli.parse_one_rm_string("240 + 5.5") == 246
+        # 240 - 2.3% -> 240 - 5.52 = 234.48 -> 234
+        assert cli.parse_one_rm_string("240 - 2.3%") == 234
+
+    def test_math_expression_edge_cases(self):
+        # Large percentage
+        assert cli.parse_one_rm_string("200 + 50%") == 300
+        # Small percentage
+        assert cli.parse_one_rm_string("100 + 1%") == 101
+        # Subtraction that results in lower value
+        assert cli.parse_one_rm_string("300 - 100") == 200
 
 
 # -------------------------------------------------------------------
@@ -661,23 +712,22 @@ def test_interactive_template_classic_builds_expected_lifts(
     # 1.  title (blank -> default)
     # 2.  template = "1"
     # 3.  squat 1RM
-    # 4.  squat bar weight (blank -> 45)
-    # 5.  squat bar label (blank -> none)
-    # 6.  bench 1RM
-    # 7.  bench bar weight (blank -> 45)
-    # 8.  bench bar label (blank -> none)
-    # 9.  deadlift 1RM
-    # 10. deadlift bar weight (blank -> 45)
-    # 11. deadlift bar label (blank -> none)
-    # 12. WPU bodyweight (blank -> skip)
-    # 13. week (blank -> all)
-    # 14. output mode "t" (text only)
+    # 4.  squat bar weight (blank -> 45, no label prompt when blank)
+    # 5.  bench 1RM
+    # 6.  bench bar weight (blank -> 45)
+    # 7.  deadlift 1RM
+    # 8.  deadlift bar weight (blank -> 45)
+    # 9.  WPU bodyweight (blank -> skip)
+    # 10. review -> continue
+    # 11. week (blank -> all)
+    # 12. output mode "t" (text only)
+    # 13. save session (blank -> skip)
     inputs = iter(
         [
             "",  # title
             "1",  # template choice -> Classic
             "455",  # squat 1RM
-            "",  # squat bar weight -> default 45 (blank returns immediately, no label prompt)
+            "",  # squat bar weight -> default 45 (blank = default, no label prompt)
             "315",  # bench 1RM
             "",  # bench bar weight -> default 45
             "500",  # deadlift 1RM
@@ -720,7 +770,7 @@ def test_interactive_template_front_squat_block_builds_expected_lifts(
             "FS Block",  # title
             "2",  # template choice -> Front-squat Block
             "355",  # front squat 1RM
-            "",  # front squat bar weight -> default 45
+            "",  # front squat bar weight -> default 45 (blank = default, no label prompt)
             "185",  # overhead press 1RM
             "",  # overhead press bar weight -> default 45
             "495",  # deadlift 1RM
@@ -767,7 +817,7 @@ def test_interactive_template_zercher_block_builds_expected_lifts(
             "Zercher Block",  # title
             "3",  # template choice -> Zercher Block
             "315",  # zercher squat 1RM
-            "",  # zercher squat bar weight -> default 45
+            "",  # zercher squat bar weight -> default 45 (blank = default, no label prompt)
             "225",  # bench press 1RM
             "",  # bench press bar weight -> default 45
             "405",  # deadlift 1RM
@@ -791,9 +841,11 @@ def test_interactive_template_zercher_block_builds_expected_lifts(
     lifts = {l["exercise"]: l for l in args.lifts}
 
     assert "squat" not in lifts
+    assert "front squat" not in lifts
     assert lifts["zercher squat"]["one_rm"] == 315
     assert lifts["bench press"]["one_rm"] == 225
     assert lifts["deadlift"]["one_rm"] == 405
+    # No WPU because we skipped BW
     assert "weighted pullup" not in lifts
 
 
@@ -812,7 +864,7 @@ def test_interactive_template_custom_with_extra_exercises(
             # Lower-body main lift slot
             "1",  # choose squat
             "455",  # squat 1RM
-            "",  # squat bar weight -> default 45 (blank returns immediately)
+            "",  # squat bar weight -> default 45 (blank = default, no label prompt)
             # Upper-body main press slot
             "1",  # choose bench press
             "315",  # bench 1RM
@@ -1286,3 +1338,484 @@ def test_loaded_session_edit_custom_title(monkeypatch, tmp_path, no_side_effects
     cli.run_interactive()
 
     assert captured["args"].title == "New Title"
+
+
+# -------------------------------------------------------------------
+# Tests for duplicate session
+# -------------------------------------------------------------------
+
+def test_duplicate_session_default_title(monkeypatch, tmp_path, no_side_effects):
+    """Duplicate mode pre-fills title as 'Copy of <session name>'."""
+    from tbweightcalc.sessions import SessionStore
+    store = SessionStore(path=tmp_path / "s.json")
+    store.save_session("Home Block", SAVED_LIFTS)
+    monkeypatch.setattr(cli, "SessionStore", lambda: store)
+
+    inputs = iter([
+        "1",    # load session
+        "d",    # duplicate
+        "",     # title -> accept default "Copy of Home Block"
+        "",     # skip adjustment
+        "c",    # review -> continue
+        "",     # week -> all
+        "t",    # text only
+        "",     # save -> accept default title
+    ])
+    monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+    captured = no_side_effects
+    cli.run_interactive()
+
+    assert captured["args"].title == "Copy of Home Block"
+
+
+def test_duplicate_session_custom_title(monkeypatch, tmp_path, no_side_effects):
+    """Duplicate mode accepts a custom title."""
+    from tbweightcalc.sessions import SessionStore
+    store = SessionStore(path=tmp_path / "s.json")
+    store.save_session("Home Block", SAVED_LIFTS)
+    monkeypatch.setattr(cli, "SessionStore", lambda: store)
+
+    inputs = iter([
+        "1",            # load session
+        "d",            # duplicate
+        "Gym Block",    # custom title
+        "",             # skip adjustment
+        "c",            # review -> continue
+        "",             # week -> all
+        "t",            # text only
+        "",             # save -> accept default title
+    ])
+    monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+    captured = no_side_effects
+    cli.run_interactive()
+
+    assert captured["args"].title == "Gym Block"
+
+
+def test_duplicate_session_saves_as_new_session(monkeypatch, tmp_path, no_side_effects):
+    """Duplicate saves a new session without touching the original."""
+    from tbweightcalc.sessions import SessionStore
+    store = SessionStore(path=tmp_path / "s.json")
+    store.save_session("Home Block", SAVED_LIFTS)
+    monkeypatch.setattr(cli, "SessionStore", lambda: store)
+
+    inputs = iter([
+        "1",                   # load session
+        "d",                   # duplicate
+        "",                    # title -> "Copy of Home Block"
+        "",                    # skip adjustment
+        "c",                   # review -> continue
+        "",                    # week -> all
+        "t",                   # text only
+        "Copy of Home Block",  # save -> confirm name
+    ])
+    monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+    cli.run_interactive()
+
+    sessions = store.list_sessions()
+    names = [s["name"] for s in sessions]
+    assert "Home Block" in names
+    assert "Copy of Home Block" in names
+    assert len(sessions) == 2
+
+
+def test_duplicate_session_lifts_match_original(monkeypatch, tmp_path, no_side_effects):
+    """Duplicated session carries the same lifts as the original."""
+    from tbweightcalc.sessions import SessionStore
+    store = SessionStore(path=tmp_path / "s.json")
+    store.save_session("Home Block", SAVED_LIFTS)
+    monkeypatch.setattr(cli, "SessionStore", lambda: store)
+
+    inputs = iter([
+        "1",    # load session
+        "d",    # duplicate
+        "",     # title -> "Copy of Home Block"
+        "",     # skip adjustment
+        "c",    # review -> continue
+        "",     # week -> all
+        "t",    # text only
+        "",     # save -> skip
+    ])
+    monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+    captured = no_side_effects
+    cli.run_interactive()
+
+    lifts = {l["exercise"]: l for l in captured["args"].lifts}
+    assert lifts["squat"]["one_rm"] == 455
+    assert lifts["bench press"]["one_rm"] == 275
+    assert lifts["deadlift"]["one_rm"] == 500
+
+
+# -------------------------------------------------------------------
+# Tests for delete session from interactive list
+# -------------------------------------------------------------------
+
+def test_delete_session_by_number(monkeypatch, tmp_path, no_side_effects):
+    """'del 1' at the session prompt deletes that session, re-shows list, then starts fresh."""
+    from tbweightcalc.sessions import SessionStore
+    store = SessionStore(path=tmp_path / "s.json")
+    store.save_session("Home Block", SAVED_LIFTS)
+    store.save_session("Gym Block", SAVED_LIFTS)
+    monkeypatch.setattr(cli, "SessionStore", lambda: store)
+
+    inputs = iter([
+        "del 1",    # delete session 1 ("Home Block")
+        "",         # re-shown list -> Enter to start fresh
+        "",         # title -> default
+        "1",        # template -> Classic
+        "455",      # squat 1RM
+        "",         # squat bar weight
+        "275",      # bench 1RM
+        "",         # bench bar weight
+        "500",      # deadlift 1RM
+        "",         # deadlift bar weight
+        "",         # skip WPU
+        "c",        # review -> continue
+        "",         # week -> all
+        "t",        # text only
+        "n",        # save -> no
+    ])
+    monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+    cli.run_interactive()
+
+    sessions = store.list_sessions()
+    names = [s["name"] for s in sessions]
+    assert "Home Block" not in names
+    assert "Gym Block" in names
+
+
+def test_delete_session_by_name(monkeypatch, tmp_path, no_side_effects):
+    """'del Gym Block' at the session prompt deletes by name then re-shows list."""
+    from tbweightcalc.sessions import SessionStore
+    store = SessionStore(path=tmp_path / "s.json")
+    store.save_session("Home Block", SAVED_LIFTS)
+    store.save_session("Gym Block", SAVED_LIFTS)
+    monkeypatch.setattr(cli, "SessionStore", lambda: store)
+
+    inputs = iter([
+        "del Gym Block",  # delete by name
+        "",               # re-shown list -> Enter to start fresh
+        "",               # title -> default
+        "1",              # template -> Classic
+        "455",            # squat 1RM
+        "",               # squat bar weight
+        "275",            # bench 1RM
+        "",               # bench bar weight
+        "500",            # deadlift 1RM
+        "",               # deadlift bar weight
+        "",               # skip WPU
+        "c",              # review -> continue
+        "",               # week -> all
+        "t",              # text only
+        "n",              # save -> no
+    ])
+    monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+    cli.run_interactive()
+
+    sessions = store.list_sessions()
+    names = [s["name"] for s in sessions]
+    assert "Gym Block" not in names
+    assert "Home Block" in names
+
+
+def test_delete_session_not_found(monkeypatch, tmp_path, no_side_effects, capsys):
+    """'del <unknown>' prints an error, re-shows list, then continues."""
+    from tbweightcalc.sessions import SessionStore
+    store = SessionStore(path=tmp_path / "s.json")
+    store.save_session("Home Block", SAVED_LIFTS)
+    monkeypatch.setattr(cli, "SessionStore", lambda: store)
+
+    inputs = iter([
+        "del NoSuchSession",  # bad name
+        "",                   # re-shown list -> Enter to start fresh
+        "",                   # title -> default
+        "1",                  # template -> Classic
+        "455",                # squat 1RM
+        "",                   # squat bar weight
+        "275",                # bench 1RM
+        "",                   # bench bar weight
+        "500",                # deadlift 1RM
+        "",                   # deadlift bar weight
+        "",                   # skip WPU
+        "c",                  # review -> continue
+        "",                   # week -> all
+        "t",                  # text only
+        "n",                  # save -> no
+    ])
+    monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+    cli.run_interactive()
+
+    out = capsys.readouterr().out
+    assert "No session found" in out
+    # Original session untouched
+    assert len(store.list_sessions()) == 1
+
+
+# -------------------------------------------------------------------
+# Test trailing newlines after text output
+# -------------------------------------------------------------------
+
+def test_text_output_ends_with_two_newlines(monkeypatch, tmp_path, no_side_effects, capsys):
+    """Text output is followed by two blank lines."""
+    from tbweightcalc.sessions import SessionStore
+    store = SessionStore(path=tmp_path / "s.json")
+    store.save_session("Home Block", SAVED_LIFTS)
+    monkeypatch.setattr(cli, "SessionStore", lambda: store)
+
+    inputs = iter([
+        "1",    # load session
+        "",     # direct output
+        "",     # week -> all
+        "t",    # text only
+    ])
+    monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+    cli.run_interactive()
+
+    out = capsys.readouterr().out
+    assert out.endswith("\n\n\n")  # program text ends \n, then print() adds \n, print() adds \n
+
+
+# -------------------------------------------------------------------
+# Tests for _apply_lift_adjustment
+# -------------------------------------------------------------------
+
+class TestApplyLiftAdjustment:
+    LIFTS = [
+        {"exercise": "squat",      "one_rm": 400, "body_weight": None, "bar_weight": 45.0, "bar_label": None},
+        {"exercise": "bench press","one_rm": 300, "body_weight": None, "bar_weight": 45.0, "bar_label": None},
+        {"exercise": "deadlift",   "one_rm": 500, "body_weight": None, "bar_weight": 45.0, "bar_label": None},
+    ]
+
+    def test_global_positive(self):
+        result = cli._apply_lift_adjustment(self.LIFTS, 5.0)
+        assert result[0]["one_rm"] == round(400 * 1.05)  # 420
+        assert result[1]["one_rm"] == round(300 * 1.05)  # 315
+        assert result[2]["one_rm"] == round(500 * 1.05)  # 525
+
+    def test_global_negative(self):
+        result = cli._apply_lift_adjustment(self.LIFTS, -5.0)
+        assert result[0]["one_rm"] == round(400 * 0.95)  # 380
+        assert result[1]["one_rm"] == round(300 * 0.95)  # 285
+        assert result[2]["one_rm"] == round(500 * 0.95)  # 475
+
+    def test_global_2_5_pct(self):
+        result = cli._apply_lift_adjustment(self.LIFTS, 2.5)
+        assert result[0]["one_rm"] == round(400 * 1.025)  # 410
+        assert result[1]["one_rm"] == round(300 * 1.025)  # 308
+        assert result[2]["one_rm"] == round(500 * 1.025)  # 513
+
+    def test_global_10_pct(self):
+        result = cli._apply_lift_adjustment(self.LIFTS, 10.0)
+        assert result[0]["one_rm"] == round(400 * 1.10)  # 440
+        assert result[1]["one_rm"] == round(300 * 1.10)  # 330
+        assert result[2]["one_rm"] == round(500 * 1.10)  # 550
+
+    def test_specific_exercise(self):
+        result = cli._apply_lift_adjustment(self.LIFTS, 5.0, exercise="squat")
+        assert result[0]["one_rm"] == round(400 * 1.05)  # 420 — adjusted
+        assert result[1]["one_rm"] == 300               # unchanged
+        assert result[2]["one_rm"] == 500               # unchanged
+
+    def test_specific_exercise_case_insensitive(self):
+        result = cli._apply_lift_adjustment(self.LIFTS, 10.0, exercise="Bench Press")
+        assert result[0]["one_rm"] == 400               # unchanged
+        assert result[1]["one_rm"] == round(300 * 1.10) # 330 — adjusted
+        assert result[2]["one_rm"] == 500               # unchanged
+
+    def test_original_lifts_not_mutated(self):
+        original = [dict(l) for l in self.LIFTS]
+        cli._apply_lift_adjustment(self.LIFTS, 5.0)
+        for orig, after in zip(original, self.LIFTS):
+            assert orig["one_rm"] == after["one_rm"]
+
+    def test_body_weight_never_modified(self):
+        lifts = [{"exercise": "weighted pullup", "one_rm": 297, "body_weight": 212, "bar_weight": 45.0, "bar_label": None}]
+        result = cli._apply_lift_adjustment(lifts, 10.0)
+        assert result[0]["body_weight"] == 212
+
+    def test_wpu_applies_pct_to_added_portion_not_full_1rm(self):
+        # WPU: 1RM=286, BW=212 → added portion = 74#
+        # +5% on added portion: round(74 * 1.05) = 78 → new 1RM = 212 + 78 = 290
+        # NOT round(286 * 1.05) = 300 (which would be wrong)
+        lifts = [{"exercise": "weighted pullup", "one_rm": 286, "body_weight": 212, "bar_weight": 45.0, "bar_label": None}]
+        result = cli._apply_lift_adjustment(lifts, 5.0)
+        assert result[0]["one_rm"] == 212 + round(74 * 1.05)   # 290
+        assert result[0]["one_rm"] != round(286 * 1.05)        # not 300
+
+    def test_zero_pct_no_change(self):
+        result = cli._apply_lift_adjustment(self.LIFTS, 0.0)
+        for orig, adj in zip(self.LIFTS, result):
+            assert orig["one_rm"] == adj["one_rm"]
+
+
+# -------------------------------------------------------------------
+# Tests for _prompt_adjustment (interactive)
+# -------------------------------------------------------------------
+
+class TestPromptAdjustment:
+    LIFTS = [
+        {"exercise": "squat",      "one_rm": 400, "body_weight": None, "bar_weight": 45.0, "bar_label": None},
+        {"exercise": "bench press","one_rm": 300, "body_weight": None, "bar_weight": 45.0, "bar_label": None},
+    ]
+
+    def test_skip_returns_unchanged(self, monkeypatch):
+        monkeypatch.setattr(builtins, "input", lambda _="": "")
+        result = cli._prompt_adjustment(self.LIFTS)
+        assert result[0]["one_rm"] == 400
+        assert result[1]["one_rm"] == 300
+
+    def test_preset_1_plus_2_5(self, monkeypatch):
+        inputs = iter(["1", ""])  # preset +2.5%, all lifts
+        monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+        result = cli._prompt_adjustment(self.LIFTS)
+        assert result[0]["one_rm"] == round(400 * 1.025)
+        assert result[1]["one_rm"] == round(300 * 1.025)
+
+    def test_preset_2_plus_5(self, monkeypatch):
+        inputs = iter(["2", ""])  # preset +5%, all lifts
+        monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+        result = cli._prompt_adjustment(self.LIFTS)
+        assert result[0]["one_rm"] == round(400 * 1.05)
+        assert result[1]["one_rm"] == round(300 * 1.05)
+
+    def test_preset_3_plus_10(self, monkeypatch):
+        inputs = iter(["3", ""])  # preset +10%, all lifts
+        monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+        result = cli._prompt_adjustment(self.LIFTS)
+        assert result[0]["one_rm"] == round(400 * 1.10)
+
+    def test_preset_4_minus_2_5(self, monkeypatch):
+        inputs = iter(["4", ""])  # preset -2.5%, all lifts
+        monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+        result = cli._prompt_adjustment(self.LIFTS)
+        assert result[0]["one_rm"] == round(400 * 0.975)
+
+    def test_preset_5_minus_5(self, monkeypatch):
+        inputs = iter(["5", ""])
+        monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+        result = cli._prompt_adjustment(self.LIFTS)
+        assert result[0]["one_rm"] == round(400 * 0.95)
+
+    def test_preset_6_minus_10(self, monkeypatch):
+        inputs = iter(["6", ""])
+        monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+        result = cli._prompt_adjustment(self.LIFTS)
+        assert result[0]["one_rm"] == round(400 * 0.90)
+
+    def test_custom_pct(self, monkeypatch):
+        inputs = iter(["7", "7.5", ""])  # custom 7.5%, all lifts
+        monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+        result = cli._prompt_adjustment(self.LIFTS)
+        assert result[0]["one_rm"] == round(400 * 1.075)
+
+    def test_specific_exercise_by_index(self, monkeypatch):
+        inputs = iter(["2", "1"])  # +5%, apply to exercise 1 (squat)
+        monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+        result = cli._prompt_adjustment(self.LIFTS)
+        assert result[0]["one_rm"] == round(400 * 1.05)  # squat adjusted
+        assert result[1]["one_rm"] == 300                # bench unchanged
+
+    def test_specific_exercise_by_name(self, monkeypatch):
+        inputs = iter(["2", "bench"])  # +5%, apply to bench
+        monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+        result = cli._prompt_adjustment(self.LIFTS)
+        assert result[0]["one_rm"] == 400                # squat unchanged
+        assert result[1]["one_rm"] == round(300 * 1.05) # bench adjusted
+
+    def test_invalid_choice_skips(self, monkeypatch):
+        monkeypatch.setattr(builtins, "input", lambda _="": "xyz")
+        result = cli._prompt_adjustment(self.LIFTS)
+        assert result[0]["one_rm"] == 400
+
+    def test_invalid_custom_pct_skips(self, monkeypatch):
+        inputs = iter(["7", "notanumber"])
+        monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+        result = cli._prompt_adjustment(self.LIFTS)
+        assert result[0]["one_rm"] == 400
+
+
+# -------------------------------------------------------------------
+# Integration: duplicate with adjustment in run_interactive
+# -------------------------------------------------------------------
+
+def test_duplicate_with_global_adjustment(monkeypatch, tmp_path, no_side_effects):
+    """Duplicate + +5% global adjustment raises all 1RMs."""
+    from tbweightcalc.sessions import SessionStore
+    store = SessionStore(path=tmp_path / "s.json")
+    store.save_session("Home Block", SAVED_LIFTS)
+    monkeypatch.setattr(cli, "SessionStore", lambda: store)
+
+    inputs = iter([
+        "1",    # load session
+        "d",    # duplicate
+        "",     # title -> "Copy of Home Block"
+        "2",    # preset +5%
+        "",     # apply to all
+        "c",    # review -> continue
+        "",     # week -> all
+        "t",    # text only
+        "",     # save -> skip
+    ])
+    monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+    captured = no_side_effects
+    cli.run_interactive()
+
+    lifts = {l["exercise"]: l for l in captured["args"].lifts}
+    assert lifts["squat"]["one_rm"] == round(455 * 1.05)
+    assert lifts["bench press"]["one_rm"] == round(275 * 1.05)
+    assert lifts["deadlift"]["one_rm"] == round(500 * 1.05)
+
+
+def test_duplicate_with_specific_exercise_adjustment(monkeypatch, tmp_path, no_side_effects):
+    """Duplicate + adjustment on only squat leaves other lifts unchanged."""
+    from tbweightcalc.sessions import SessionStore
+    store = SessionStore(path=tmp_path / "s.json")
+    store.save_session("Home Block", SAVED_LIFTS)
+    monkeypatch.setattr(cli, "SessionStore", lambda: store)
+
+    inputs = iter([
+        "1",    # load session
+        "d",    # duplicate
+        "",     # title -> "Copy of Home Block"
+        "2",    # preset +5%
+        "1",    # apply to exercise 1 (squat)
+        "c",    # review -> continue
+        "",     # week -> all
+        "t",    # text only
+        "",     # save -> skip
+    ])
+    monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+    captured = no_side_effects
+    cli.run_interactive()
+
+    lifts = {l["exercise"]: l for l in captured["args"].lifts}
+    assert lifts["squat"]["one_rm"] == round(455 * 1.05)
+    assert lifts["bench press"]["one_rm"] == 275   # unchanged
+    assert lifts["deadlift"]["one_rm"] == 500       # unchanged
+
+
+def test_duplicate_skip_adjustment(monkeypatch, tmp_path, no_side_effects):
+    """Duplicate with no adjustment leaves 1RMs unchanged."""
+    from tbweightcalc.sessions import SessionStore
+    store = SessionStore(path=tmp_path / "s.json")
+    store.save_session("Home Block", SAVED_LIFTS)
+    monkeypatch.setattr(cli, "SessionStore", lambda: store)
+
+    inputs = iter([
+        "1",    # load session
+        "d",    # duplicate
+        "",     # title -> "Copy of Home Block"
+        "",     # skip adjustment
+        "c",    # review -> continue
+        "",     # week -> all
+        "t",    # text only
+        "",     # save -> skip
+    ])
+    monkeypatch.setattr(builtins, "input", lambda _="": next(inputs))
+    captured = no_side_effects
+    cli.run_interactive()
+
+    lifts = {l["exercise"]: l for l in captured["args"].lifts}
+    assert lifts["squat"]["one_rm"] == 455
+    assert lifts["bench press"]["one_rm"] == 275
+    assert lifts["deadlift"]["one_rm"] == 500

@@ -343,8 +343,8 @@ class ExerciseCluster:
                     self.body_weight,
                     d["multiplier"] * self.week_multiplier,
                 )
-                # Plate breakdown only when total weight > 45#
-                s.plate_breakdown_on = s.weight > 45
+                # Plate breakdown whenever added weight > 0
+                s.plate_breakdown_on = s.weight > 0
 
             built_sets.append(s)
 

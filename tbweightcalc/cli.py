@@ -309,6 +309,8 @@ def evaluate_weight_expression(base_weight: float, expression: str) -> float:
     Raises ValueError if the expression cannot be parsed.
     """
     expr = expression.strip()
+
+    # Match pattern: operator (+ or -), number, optional % or lbs
     match = re.match(r'^([+\-])\s*(\d+(?:\.\d+)?)\s*(%|lbs?)?$', expr, re.IGNORECASE)
     if not match:
         raise ValueError(f"Invalid expression: {expression}")
@@ -318,13 +320,15 @@ def evaluate_weight_expression(base_weight: float, expression: str) -> float:
     unit = match.group(3)
 
     if unit and unit.strip().lower().startswith('%'):
+        # Percentage calculation
         adjustment = base_weight * (value / 100.0)
     else:
+        # Absolute value (lbs or no unit means lbs)
         adjustment = value
 
     if operator == '+':
         return base_weight + adjustment
-    else:
+    else:  # operator == '-'
         return base_weight - adjustment
 
 
@@ -773,6 +777,95 @@ def _prompt_save_session(lifts: list[dict], store: SessionStore, default_name: s
     print(f"[{action} session '{session['name']}' ({session['id']})]")
 
 
+_ADJUSTMENT_PRESETS = [
+    ("+2.5%",  2.5),
+    ("+5%",    5.0),
+    ("+10%",  10.0),
+    ("-2.5%", -2.5),
+    ("-5%",   -5.0),
+    ("-10%", -10.0),
+]
+
+
+def _apply_lift_adjustment(lifts: list[dict], pct: float, exercise: str | None = None) -> list[dict]:
+    """Return a new lifts list with one_rm values scaled by pct%.
+
+    For WPU lifts (body_weight is set), the % is applied to the added-weight
+    portion only (one_rm - body_weight), so the displayed working weights scale
+    proportionally rather than being amplified by the bodyweight offset.
+
+    For all other lifts the % is applied to the full one_rm.
+    body_weight is never modified.
+    """
+    result = []
+    for lift in lifts:
+        l = dict(lift)
+        if exercise is None or l["exercise"].lower() == exercise.lower():
+            if l.get("one_rm") is not None:
+                bw = l.get("body_weight")
+                if bw is not None:
+                    # WPU: scale only the added-weight portion
+                    added = l["one_rm"] - bw
+                    l["one_rm"] = bw + round(added * (1 + pct / 100))
+                else:
+                    l["one_rm"] = round(l["one_rm"] * (1 + pct / 100))
+        result.append(l)
+    return result
+
+
+def _prompt_adjustment(lifts: list[dict]) -> list[dict]:
+    """Offer preset or custom % adjustment to 1RM values, globally or per-exercise."""
+    print("\nAdjust 1RMs:")
+    labels = "  ".join(f"[{i}] {label}" for i, (label, _) in enumerate(_ADJUSTMENT_PRESETS, 1))
+    print(f"  {labels}  [7] Custom")
+    raw = input("Choice (Enter to skip): ").strip()
+    if not raw:
+        return lifts
+
+    pct: float | None = None
+    if raw.isdigit() and 1 <= int(raw) <= 6:
+        pct = _ADJUSTMENT_PRESETS[int(raw) - 1][1]
+    elif raw == "7":
+        custom = input("Enter % (e.g. 7.5 or -3): ").strip()
+        try:
+            pct = float(custom)
+        except ValueError:
+            print("Invalid percentage; skipping adjustment.")
+            return lifts
+    else:
+        try:
+            pct = float(raw)
+        except ValueError:
+            print("Invalid choice; skipping adjustment.")
+            return lifts
+
+    # --- Scope ---
+    exercises = [l["exercise"] for l in lifts]
+    print("\nApply to:")
+    print("  [Enter] All lifts")
+    for i, ex in enumerate(exercises, 1):
+        orm = lifts[i - 1].get("one_rm")
+        print(f"  [{i}] {format_exercise_name(ex)} (1RM: {orm})")
+    scope = input("Choice (Enter for all): ").strip()
+
+    exercise: str | None = None
+    if scope:
+        try:
+            idx = int(scope)
+            if 1 <= idx <= len(exercises):
+                exercise = exercises[idx - 1]
+        except ValueError:
+            for ex in exercises:
+                if scope.lower() in ex.lower():
+                    exercise = ex
+                    break
+
+    adjusted = _apply_lift_adjustment(lifts, pct, exercise)
+    target = f"'{exercise}'" if exercise else "all lifts"
+    print(f"[Applied {pct:+.4g}% to {target}]")
+    return adjusted
+
+
 def _print_sessions(sessions: list[dict]) -> None:
     if not sessions:
         print("  (no saved sessions)")
@@ -801,17 +894,29 @@ def run_interactive() -> None:
     store = SessionStore()
 
     # --- Offer to load a saved session ---
-    sessions = store.list_sessions()
     lifts: list[dict] = []
     loaded_from_session = False
-
     loaded_session_name: str | None = None
 
-    if sessions:
+    while True:
+        sessions = store.list_sessions()
+        if not sessions:
+            break
         print("Saved sessions:")
         _print_sessions(sessions)
-        load_raw = input("\nLoad a session? Enter number/name or press Enter to start fresh: ").strip()
-        if load_raw:
+        load_raw = input("\nLoad a session (number/name), 'del <number/name>' to delete, or Enter to start fresh: ").strip()
+        if not load_raw:
+            break
+        if load_raw.lower().startswith("del "):
+            target = load_raw[4:].strip()
+            victim = store.load_session(target)
+            if victim:
+                store.delete_session(victim["id"])
+                print(f"[Deleted '{victim['name']}']")
+            else:
+                print(f"No session found for '{target}'.")
+            # loop back to show updated list
+        else:
             session = store.load_session(load_raw)
             if session:
                 lifts = [dict(lift) for lift in session["lifts"]]
@@ -820,14 +925,22 @@ def run_interactive() -> None:
                 print(f"[Loaded '{session['name']}']")
             else:
                 print(f"No session found for '{load_raw}'; starting fresh.")
+            break
 
     skip_save = False
     if loaded_from_session:
-        mode = input("\nEdit or output? [e/o, default o]: ").strip().lower()
+        mode = input("\nEdit, duplicate, or output? [e/d/o, default o]: ").strip().lower()
         if mode == "e":
             # --- Title (edit mode only) ---
             raw_title = input(f"\nProgram title (Enter for '{loaded_session_name}'): ").strip()
             title = raw_title if raw_title else loaded_session_name
+            lifts = _review_and_edit_lifts(lifts, store=store)
+        elif mode == "d":
+            # --- Duplicate: adjust, edit flow, save as a new session ---
+            default_dup_title = f"Copy of {loaded_session_name}"
+            raw_title = input(f"\nProgram title (Enter for '{default_dup_title}'): ").strip()
+            title = raw_title if raw_title else default_dup_title
+            lifts = _prompt_adjustment(lifts)
             lifts = _review_and_edit_lifts(lifts, store=store)
         else:
             title = loaded_session_name
@@ -1024,6 +1137,8 @@ def run_interactive() -> None:
 
     if out_mode in ("t", "b"):
         print(screen_output)
+        print()
+        print()
         copy_to_clipboard(screen_output)
 
     # ---------- PDF output ----------
@@ -1147,13 +1262,10 @@ def main() -> None:
         help="Delete a saved custom bar by name and exit",
     )
 
-    # No arguments at all -> full interactive program mode
+    # No arguments at all -> full TUI mode
     if len(sys.argv) == 1:
-        try:
-            run_interactive()
-        except KeyboardInterrupt:
-            # Clean, quiet exit on Ctrl-C
-            print("\n[Aborted by user]")
+        from tbweightcalc.tui import run_tui
+        run_tui()
         return
 
     args = parser.parse_args()

@@ -28,7 +28,8 @@ class SessionStore:
             json.dump(data, f, indent=2)
 
     def list_sessions(self) -> list[dict]:
-        return self._load()["sessions"]
+        sessions = self._load()["sessions"]
+        return sorted(sessions, key=lambda s: s.get("updated") or s["created"], reverse=True)
 
     def save_session(self, name: str, lifts: list[dict]) -> dict:
         """Save or update a session by name. Returns the saved session dict."""
@@ -49,7 +50,7 @@ class SessionStore:
                 return updated
 
         new_session = {
-            "id": str(uuid.uuid4())[:8],
+            "id": str(uuid.uuid4())[:4],
             "name": name,
             "created": today,
             "lifts": lifts,

@@ -130,7 +130,7 @@ class ExerciseSet:
             self.weight = w
 
     def calc_weighted_pullup(self, working_weight, body_weight, multiplier):
-        calc_weight = ExerciseSet.round_weight((working_weight - body_weight) * multiplier)
+        calc_weight = ExerciseSet.round_weight(working_weight * multiplier - body_weight)
         if calc_weight <= 0:
             self.weight = 0
         else:
@@ -177,8 +177,8 @@ class ExerciseSet:
         if self.bar == False and corrected_weight <= 0:
             final_string = "Bodyweight"
         elif self.bar == True and corrected_weight <= self.bar_weight:
-            # Use custom label if provided, otherwise default to "Bar"
-            final_string = self.bar_label if self.bar_label else "Bar"
+            # Always use "Bar" for individual reps (label only appears in exercise title)
+            final_string = "Bar"
 
         return final_string.strip()
 
