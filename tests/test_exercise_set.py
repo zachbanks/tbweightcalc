@@ -89,6 +89,11 @@ class TestExerciseSet(unittest.TestCase):
             s.calc_lifting_weight(225, 0.55)
             self.assertEqual(s.weight, 125)
 
+            # Prefer a nearby 5 lb bump when it reduces plate clutter.
+            s.calc_lifting_weight(220, 1.0)
+            self.assertEqual(s.weight, 225)
+            self.assertEqual(s.plate_breakdown, "(45 x 2)")
+
         def test_calc_weighted_pullup(self):
             s = ExerciseSet(bar=False)
 

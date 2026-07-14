@@ -46,10 +46,10 @@ class TestExerciseCluster(unittest.TestCase):
         out = str(c)
         lines = out.strip().splitlines()
 
-        # Expect a heavy triple around 360 somewhere
+        # Expect a heavy triple around 365 somewhere
         self.assertTrue(
-            any("(1-3) x 3" in line and "360" in line for line in lines),
-            "Expected a (1-3) x 3 set with 360 in deadlift cluster output.",
+            any("(1-3) x 3" in line and "365" in line for line in lines),
+            "Expected a (1-3) x 3 set with 365 in deadlift cluster output.",
         )
 
         # ----- Weighted pull-ups: week 1, % applied to added weight -> shows added weight -----

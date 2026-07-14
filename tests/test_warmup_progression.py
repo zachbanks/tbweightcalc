@@ -189,7 +189,7 @@ class TestExerciseClusterWarmupQuality:
         cluster = ExerciseCluster(week=1, exercise="bench press", oneRepMax=283, bar_weight=45.0)
         weights = [s.weight for s in cluster.sets]
 
-        assert weights[-1] == 200, f"Expected working weight 200, got {weights[-1]}"
+        assert weights[-1] == 205, f"Expected working weight 205, got {weights[-1]}"
         assert len(cluster.sets) == 5
 
         # 0.5 warmup: target = 100. Should be 90–120.

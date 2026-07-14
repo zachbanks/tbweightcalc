@@ -119,7 +119,10 @@ class ExerciseSet:
         self.max_reps = r
 
     def calc_lifting_weight(self, working_weight, multiplier):
-        w = ExerciseSet.round_weight(working_weight * multiplier)
+        w = optimize_lifting_weight(
+            working_weight * multiplier,
+            bar_weight=self.bar_weight,
+        )
 
         if w == 0:
             self.weight = self.bar_weight
@@ -183,6 +186,38 @@ class ExerciseSet:
     @staticmethod
     def round_weight(weight):
         return int(5 * round(weight / 5))
+
+
+def optimize_lifting_weight(
+    weight: float,
+    *,
+    bar_weight: float = 45.0,
+    available_plates: Iterable[float] | None = None,
+) -> float:
+    """
+    Round a lifting weight to the nearest 5 lb increment, then nudge upward
+    by one increment when it reduces plate clutter.
+
+    This keeps the existing rounding behavior for direct weights, but lets top
+    sets avoid awkward plate stacks like 45/35/5/2.5 when a nearby +5 option
+    can be loaded with fewer plates.
+    """
+
+    if weight <= bar_weight:
+        return ExerciseSet.round_weight(weight)
+
+    rounded_weight = ExerciseSet.round_weight(weight)
+    if available_plates is None:
+        available_plates = [45, 35, 25, 15, 10, 5, 2.5]
+
+    current_plates = get_plate_list(rounded_weight, bar_weight, available_plates)
+    next_weight = rounded_weight + 5
+    next_plates = get_plate_list(next_weight, bar_weight, available_plates)
+
+    if len(next_plates) < len(current_plates):
+        return next_weight
+
+    return rounded_weight
 
 
 def get_plate_list(
