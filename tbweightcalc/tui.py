@@ -6,27 +6,127 @@ import datetime
 from dataclasses import dataclass, field
 from typing import Optional
 
-from textual import on
-from textual.app import App, ComposeResult
-from textual.events import Key
-from textual.binding import Binding
-from textual.containers import Container, Horizontal, Vertical, ScrollableContainer
-from textual.screen import Screen, ModalScreen
-from textual.widgets import (
-    Button,
-    DataTable,
-    Footer,
-    Header,
-    Input,
-    Label,
-    ListItem,
-    ListView,
-    RadioButton,
-    RadioSet,
-    Rule,
-    Static,
-    TextArea,
-)
+try:
+    from textual import on
+    from textual.app import App, ComposeResult
+    from textual.events import Key
+    from textual.binding import Binding
+    from textual.containers import Container, Horizontal, Vertical, ScrollableContainer
+    from textual.screen import Screen, ModalScreen
+    from textual.widgets import (
+        Button,
+        DataTable,
+        Footer,
+        Header,
+        Input,
+        Label,
+        ListItem,
+        ListView,
+        RadioButton,
+        RadioSet,
+        Rule,
+        Static,
+        TextArea,
+    )
+except ImportError:  # pragma: no cover - exercised indirectly when Textual is absent
+    def on(*_args, **_kwargs):
+        def decorator(func):
+            return func
+
+        return decorator
+
+    class _StubEvent:
+        pass
+
+    class _StubWidget:
+        Pressed = _StubEvent
+        Changed = _StubEvent
+        Selected = _StubEvent
+        Submitted = _StubEvent
+        RowSelected = _StubEvent
+
+        def __init__(self, *args, **kwargs):
+            self.args = args
+            self.kwargs = kwargs
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    class Binding:  # type: ignore[override]
+        def __init__(self, *args, **kwargs):
+            self.args = args
+            self.kwargs = kwargs
+
+    class App:  # type: ignore[override]
+        def __init__(self, *args, **kwargs):
+            self.args = args
+            self.kwargs = kwargs
+
+        def run(self, *args, **kwargs):
+            raise ImportError("textual is required to run the TUI")
+
+    class Screen:  # type: ignore[override]
+        pass
+
+    class ModalScreen(Screen):  # type: ignore[override]
+        pass
+
+    ComposeResult = object
+    Key = object
+
+    class Container(_StubWidget):
+        pass
+
+    class Horizontal(_StubWidget):
+        pass
+
+    class Vertical(_StubWidget):
+        pass
+
+    class ScrollableContainer(_StubWidget):
+        pass
+
+    class Button(_StubWidget):
+        pass
+
+    class DataTable(_StubWidget):
+        pass
+
+    class Footer(_StubWidget):
+        pass
+
+    class Header(_StubWidget):
+        pass
+
+    class Input(_StubWidget):
+        pass
+
+    class Label(_StubWidget):
+        pass
+
+    class ListItem(_StubWidget):
+        pass
+
+    class ListView(_StubWidget):
+        pass
+
+    class RadioButton(_StubWidget):
+        pass
+
+    class RadioSet(_StubWidget):
+        pass
+
+    class Rule(_StubWidget):
+        pass
+
+    class Static(_StubWidget):
+        pass
+
+    class TextArea(_StubWidget):
+        pass
 
 from tbweightcalc.sessions import SessionStore
 from tbweightcalc.cli import (
